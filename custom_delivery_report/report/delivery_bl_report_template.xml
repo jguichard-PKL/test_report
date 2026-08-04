@@ -22,7 +22,7 @@
                     .bl_custom_report .text-end { text-align: right; }
                     .bl_custom_report .text-center { text-align: center; }
                     .bl_custom_report .bl-title { font-size: 20pt; font-weight: bold; margin: 18px 0 12px 0; }
-                    .bl_custom_report .bl-page-num { text-align: right; font-size: 9pt; margin-bottom: 6px; }
+                    .bl_custom_report .bl-page-num { text-align: right; font-size: 9pt; margin-top: 6px; }
                     .bl_custom_report .bl-box { border: 1px solid #000; padding: 4px 6px; }
                     .bl_custom_report .bl-box-header { text-align: center; font-weight: bold; border-bottom: 1px solid #000; margin: -4px -6px 4px -6px; padding: 3px; }
                     .bl_custom_report .bl-info-table td { border: 1px solid #000; padding: 3px 6px; }
@@ -31,7 +31,7 @@
                     .bl_custom_report .bl-items th, .bl_custom_report .bl-items td { border: 1px solid #000; padding: 3px 5px; vertical-align: top; }
                     .bl_custom_report .bl-items th { font-weight: bold; text-align: center; }
                     .bl_custom_report .bl-spacer { flex: 1 1 auto; }
-                    .bl_custom_report .bl-total-box { border: 1px solid #000; font-weight: bold; }
+                    .bl_custom_report .bl-total-box { border: 1px solid #000; font-weight: bold; margin-top: 20px; }
                     .bl_custom_report .bl-total-box td { padding: 6px 8px; }
                     .bl_custom_report .bl-footer-legal { font-size: 7.5pt; border-top: 1px solid #000; padding-top: 4px; margin-top: 14px; text-align: center; }
                 </style>
@@ -55,7 +55,7 @@
                 </table>
 
                 <!-- Addressee block -->
-                <table style="margin-top: 20px;">
+                <table style="margin-top: 40px;">
                     <tr>
                         <td style="width: 55%; vertical-align: top;"/>
                         <td style="width: 45%; vertical-align: top;">
@@ -101,7 +101,6 @@
                         </td>
                         <td style="width: 8%;"></td>
                         <td style="width: 48%; vertical-align: top;">
-                            <div class="bl-page-num">Page : 1</div>
                             <div class="bl-box">
                                 <div class="bl-box-header">Lieu de livraison</div>
                                 <div t-if="ship_to.parent_id" style="font-weight: bold;" t-out="ship_to.parent_id.name"/>
@@ -114,6 +113,7 @@
                                 </div>
                                 <div t-if="ship_to.country_id" t-out="ship_to.country_id.name"/>
                             </div>
+                            <div class="bl-page-num">Page : 1</div>
                         </td>
                     </tr>
                 </table>
@@ -152,7 +152,7 @@
                     <tr>
                         <td style="width: 50%; text-align: left;">Total Bon de Livraison N° <span t-out="doc.name"/></td>
                         <td style="width: 25%; text-align: center;" t-out="'%.2f' % doc.bl_get_total_qty()"/>
-                        <td style="width: 25%; text-align: left;" t-out="'%.2f' % doc.bl_get_total_amount()"/>
+                        <td style="width: 25%; text-align: right;" t-out="'%.2f' % doc.bl_get_total_amount()"/>
                     </tr>
                 </table>
 
