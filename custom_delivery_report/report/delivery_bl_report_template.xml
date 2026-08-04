@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="report_delivery_bl_document">
+        <t t-foreach="docs" t-as="o">
+            <t t-call="custom_delivery_report.report_delivery_bl_document_body" t-lang="o._get_report_lang()"/>
+        </t>
+    </template>
+
+    <template id="report_delivery_bl_document_body">
+        <t t-set="doc" t-value="o"/>
+        <t t-set="company" t-value="o.company_id"/>
+        <t t-set="addressee" t-value="o.bl_get_addressee()"/>
+        <t t-set="ship_to" t-value="o.bl_get_ship_to()"/>
+        <t t-set="currency" t-value="o.bl_get_currency()"/>
+        <t t-set="lines" t-value="o.bl_get_lines()"/>
+        <t t-call="web.basic_layout">
+            <div class="bl_custom_report">
+                <style>
+                    .bl_custom_report { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; }
+                    .bl_custom_report table { border-collapse: collapse; width: 100%; }
+                    .bl_custom_report .text-end { text-align: right; }
+                    .bl_custom_report .text-center { text-align: center; }
+                    .bl_custom_report .bl-title { font-size: 20pt; font-weight: bold; margin: 18px 0 12px 0; }
+                    .bl_custom_report .bl-page-num { text-align: right; font-size: 9pt; margin-bottom: 6px; }
+                    .bl_custom_report .bl-box { border: 1px solid #000; padding: 4px 6px; }
+                    .bl_custom_report .bl-box-header { text-align: center; font-weight: bold; border-bottom: 1px solid #000; margin: -4px -6px 4px -6px; padding: 3px; }
+                    .bl_custom_report .bl-info-table td { border: 1px solid #000; padding: 3px 6px; }
+                    .bl_custom_report .bl-info-table th { border: 1px solid #000; padding: 3px 6px; text-align: center; }
+                    .bl_custom_report .bl-items { margin-top: 18px; }
+                    .bl_custom_report .bl-items th, .bl_custom_report .bl-items td { border: 1px solid #000; padding: 3px 5px; vertical-align: top; }
+                    .bl_custom_report .bl-items th { font-weight: bold; text-align: center; }
+                    .bl_custom_report .bl-total-box { border: 1px solid #000; padding: 6px 8px; font-weight: bold; margin-top: 40px; display: flex; justify-content: space-between; }
+                    .bl_custom_report .bl-footer-legal { font-size: 7.5pt; border-top: 1px solid #000; padding-top: 4px; margin-top: 14px; text-align: center; }
+                </style>
+
+                <!-- Issuer (left) / logo (right) -->
+                <table>
+                    <tr>
+                        <td style="width: 55%; vertical-align: top;">
+                            <div style="font-weight: bold;" t-out="company.name"/>
+                            <div t-if="company.street" t-out="company.street"/>
+                            <div t-if="company.street2" t-out="company.street2"/>
+                            <div>
+                                <span t-out="company.zip"/> <span t-out="company.city"/>
+                            </div>
+                            <div t-if="company.phone">Tel <span t-out="company.phone"/></div>
+                        </td>
+                        <td style="width: 45%; vertical-align: top; text-align: right;">
+                            <img t-if="company.logo" t-att-src="image_data_uri(company.logo)" style="max-height: 70px; max-width: 100%;"/>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Addressee block -->
+                <table style="margin-top: 20px;">
+                    <tr>
+                        <td style="width: 55%; vertical-align: top;"/>
+                        <td style="width: 45%; vertical-align: top;">
+                            <div style="font-weight: bold;" t-out="addressee.name"/>
+                            <div t-if="addressee.street" t-out="addressee.street"/>
+                            <div t-if="addressee.street2" t-out="addressee.street2"/>
+                            <div>
+                                <span t-out="addressee.zip"/> <span t-out="addressee.city"/>
+                            </div>
+                            <div t-if="addressee.vat" style="margin-top: 8px;">
+                                N° intracommunautaire : <span t-out="addressee.vat"/>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Title / BL info box (left) / delivery address box (right) -->
+                <table style="margin-top: 6px;">
+                    <tr>
+                        <td style="width: 55%; vertical-align: top;">
+                            <div class="bl-title">Bon de Livraison</div>
+
+                            <table class="bl-info-table">
+                                <tr>
+                                    <th style="width: 50%;">N° du BL</th>
+                                    <th style="width: 50%;">Date</th>
+                                </tr>
+                                <tr>
+                                    <td style="text-align: center; font-weight: bold;" t-out="doc.name"/>
+                                    <td style="text-align: center;" t-out="doc.bl_get_report_date_str()"/>
+                                </tr>
+                            </table>
+
+                            <div class="bl-box" style="border-top: none;">
+                                <div>Référence : <span t-if="doc.sale_id.client_order_ref" t-out="doc.sale_id.client_order_ref"/></div>
+                                <div>Devise : <span t-out="currency.name"/></div>
+                            </div>
+
+                            <div class="bl-box" style="border-top: none;">
+                                <div>Transporteur : <span t-out="doc.carrier_id.name or ''"/></div>
+                                <div t-if="doc.carrier_tracking_ref">N° Colis : <span t-out="doc.carrier_tracking_ref"/></div>
+                            </div>
+                        </td>
+                        <td style="width: 45%; vertical-align: top;">
+                            <div class="bl-page-num">Page : 1</div>
+                            <div class="bl-box">
+                                <div class="bl-box-header">Lieu de livraison</div>
+                                <div t-if="ship_to.parent_id" style="font-weight: bold;" t-out="ship_to.parent_id.name"/>
+                                <div t-if="ship_to.parent_id" t-out="ship_to.name"/>
+                                <div t-else="" style="font-weight: bold;" t-out="ship_to.name"/>
+                                <div t-if="ship_to.street" t-out="ship_to.street"/>
+                                <div t-if="ship_to.street2" t-out="ship_to.street2"/>
+                                <div>
+                                    <span t-out="ship_to.zip"/> <span t-out="ship_to.city"/>
+                                </div>
+                                <div t-if="ship_to.country_id" t-out="ship_to.country_id.name"/>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Line items -->
+                <table class="bl-items">
+                    <thead>
+                        <tr>
+                            <th style="width: 15%;">Référence</th>
+                            <th style="width: 44%;">Désignation</th>
+                            <th style="width: 9%;">Qté</th>
+                            <th style="width: 8%;">Cdt</th>
+                            <th style="width: 12%;">P.U. H.T.</th>
+                            <th style="width: 12%;">Montant HT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="lines" t-as="line">
+                            <td t-out="line.product_id.default_code or ''"/>
+                            <td>
+                                <div t-out="line.move_id.description_picking or line.product_id.display_name"/>
+                                <div t-if="line.lot_id or line.lot_name">
+                                    lot <span t-out="line.lot_id.name or line.lot_name"/>
+                                </div>
+                            </td>
+                            <td class="text-end" t-out="'%.2f' % line.quantity"/>
+                            <td class="text-center" t-out="line.product_uom_id.name"/>
+                            <td class="text-end" t-out="'%.4f' % doc.bl_get_line_price_unit(line)"/>
+                            <td class="text-end" t-out="'%.2f' % doc.bl_get_line_amount(line)"/>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- Total -->
+                <div class="bl-total-box">
+                    <span>Total Bon de Livraison N° <span t-out="doc.name"/></span>
+                    <span t-out="'%.2f' % doc.bl_get_total_qty()"/>
+                    <span t-out="'%.2f' % doc.bl_get_total_amount()"/>
+                </div>
+
+                <!-- Legal footer -->
+                <div class="bl-footer-legal">
+                    <t t-if="company.report_footer" t-out="company.report_footer"/>
+                    <t t-else="">
+                        <span t-if="company.partner_id.company_registry">N° Siret : <t t-out="company.partner_id.company_registry"/></span>
+                        <span t-if="company.vat">&#160;&#160;&#160;N° TVA IntraComm : <t t-out="company.vat"/></span>
+                    </t>
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

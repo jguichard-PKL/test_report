@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="paperformat_delivery_bl_custom" model="report.paperformat">
+        <field name="name">Bon de livraison Synergie</field>
+        <field name="default" eval="False"/>
+        <field name="format">A4</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">10</field>
+        <field name="margin_bottom">15</field>
+        <field name="margin_left">7</field>
+        <field name="margin_right">7</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">90</field>
+    </record>
+
+    <record id="action_report_delivery_bl_custom" model="ir.actions.report">
+        <field name="name">Bon de livraison Synergie</field>
+        <field name="model">stock.picking</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_delivery_report.report_delivery_bl_document</field>
+        <field name="report_file">custom_delivery_report.report_delivery_bl_document</field>
+        <field name="print_report_name">'Bon de Livraison - %s' % (object.name)</field>
+        <field name="paperformat_id" ref="paperformat_delivery_bl_custom"/>
+        <field name="binding_model_id" ref="stock.model_stock_picking"/>
+        <field name="binding_type">report</field>
+    </record>
+
+</odoo>
