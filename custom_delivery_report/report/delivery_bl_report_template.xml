@@ -17,7 +17,7 @@
         <t t-call="web.basic_layout">
             <div class="bl_custom_report">
                 <style>
-                    .bl_custom_report { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; }
+                    .bl_custom_report { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; display: flex; flex-direction: column; min-height: 272mm; }
                     .bl_custom_report table { border-collapse: collapse; width: 100%; }
                     .bl_custom_report .text-end { text-align: right; }
                     .bl_custom_report .text-center { text-align: center; }
@@ -30,7 +30,9 @@
                     .bl_custom_report .bl-items { margin-top: 18px; }
                     .bl_custom_report .bl-items th, .bl_custom_report .bl-items td { border: 1px solid #000; padding: 3px 5px; vertical-align: top; }
                     .bl_custom_report .bl-items th { font-weight: bold; text-align: center; }
-                    .bl_custom_report .bl-total-box { border: 1px solid #000; padding: 6px 8px; font-weight: bold; margin-top: 40px; display: flex; justify-content: space-between; }
+                    .bl_custom_report .bl-spacer { flex: 1 1 auto; }
+                    .bl_custom_report .bl-total-box { border: 1px solid #000; font-weight: bold; }
+                    .bl_custom_report .bl-total-box td { padding: 6px 8px; }
                     .bl_custom_report .bl-footer-legal { font-size: 7.5pt; border-top: 1px solid #000; padding-top: 4px; margin-top: 14px; text-align: center; }
                 </style>
 
@@ -73,7 +75,7 @@
                 <!-- Title / BL info box (left) / delivery address box (right) -->
                 <table style="margin-top: 6px;">
                     <tr>
-                        <td style="width: 55%; vertical-align: top;">
+                        <td style="width: 44%; vertical-align: top;">
                             <div class="bl-title">Bon de Livraison</div>
 
                             <table class="bl-info-table">
@@ -97,7 +99,8 @@
                                 <div t-if="doc.carrier_tracking_ref">N° Colis : <span t-out="doc.carrier_tracking_ref"/></div>
                             </div>
                         </td>
-                        <td style="width: 45%; vertical-align: top;">
+                        <td style="width: 8%;"></td>
+                        <td style="width: 48%; vertical-align: top;">
                             <div class="bl-page-num">Page : 1</div>
                             <div class="bl-box">
                                 <div class="bl-box-header">Lieu de livraison</div>
@@ -119,8 +122,7 @@
                 <table class="bl-items">
                     <thead>
                         <tr>
-                            <th style="width: 15%;">Référence</th>
-                            <th style="width: 44%;">Désignation</th>
+                            <th style="width: 59%;">Désignation</th>
                             <th style="width: 9%;">Qté</th>
                             <th style="width: 8%;">Cdt</th>
                             <th style="width: 12%;">P.U. H.T.</th>
@@ -129,7 +131,6 @@
                     </thead>
                     <tbody>
                         <tr t-foreach="lines" t-as="line">
-                            <td t-out="line.product_id.default_code or ''"/>
                             <td>
                                 <div t-out="line.move_id.description_picking or line.product_id.display_name"/>
                                 <div t-if="line.lot_id or line.lot_name">
@@ -144,12 +145,16 @@
                     </tbody>
                 </table>
 
+                <div class="bl-spacer"/>
+
                 <!-- Total -->
-                <div class="bl-total-box">
-                    <span>Total Bon de Livraison N° <span t-out="doc.name"/></span>
-                    <span t-out="'%.2f' % doc.bl_get_total_qty()"/>
-                    <span t-out="'%.2f' % doc.bl_get_total_amount()"/>
-                </div>
+                <table class="bl-total-box">
+                    <tr>
+                        <td style="width: 50%; text-align: left;">Total Bon de Livraison N° <span t-out="doc.name"/></td>
+                        <td style="width: 25%; text-align: center;" t-out="'%.2f' % doc.bl_get_total_qty()"/>
+                        <td style="width: 25%; text-align: left;" t-out="'%.2f' % doc.bl_get_total_amount()"/>
+                    </tr>
+                </table>
 
                 <!-- Legal footer -->
                 <div class="bl-footer-legal">
