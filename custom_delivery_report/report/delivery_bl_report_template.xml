@@ -100,9 +100,8 @@
                         <td style="width: 48%; vertical-align: top;">
                             <div class="bl-box">
                                 <div class="bl-box-header">Lieu de livraison</div>
-                                <div t-if="ship_to.parent_id" style="font-weight: bold;" t-out="ship_to.parent_id.name"/>
-                                <div t-if="ship_to.parent_id" t-out="ship_to.name"/>
-                                <div t-else="" style="font-weight: bold;" t-out="ship_to.name"/>
+                                <div style="font-weight: bold;" t-out="ship_to.commercial_partner_id.name"/>
+                                <div t-if="not ship_to.is_company and ship_to.name != ship_to.commercial_partner_id.name" t-out="ship_to.name"/>
                                 <div t-if="ship_to.street" t-out="ship_to.street"/>
                                 <div t-if="ship_to.street2" t-out="ship_to.street2"/>
                                 <div>

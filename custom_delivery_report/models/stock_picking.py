@@ -10,9 +10,14 @@ class StockPicking(models.Model):
         return self.sale_id.partner_invoice_id or self.partner_id
 
     def bl_get_ship_to(self):
-        """Delivery address of the linked order ("Lieu de livraison" block)."""
+        """Delivery address of this transfer ("Lieu de livraison" block).
+
+        Uses the picking's own partner_id (not the order's partner_shipping_id)
+        so it reflects any override made on the transfer itself, even after
+        the order has been confirmed.
+        """
         self.ensure_one()
-        return self.sale_id.partner_shipping_id or self.partner_id
+        return self.partner_id
 
     def bl_get_report_date_str(self):
         self.ensure_one()
