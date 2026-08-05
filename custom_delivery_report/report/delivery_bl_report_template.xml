@@ -34,7 +34,8 @@
                     .bl_custom_report .footer { margin-top: 20px; }
                     .bl_custom_report .bl-total-box { border: 1px solid #000; font-weight: bold; }
                     .bl_custom_report .bl-total-box td { padding: 6px 8px; }
-                    .bl_custom_report .bl-footer-legal { font-size: 7.5pt; border-top: 1px solid #000; padding-top: 4px; margin-top: 14px; text-align: center; }
+                    .bl_custom_report .bl-footer-legal { font-size: 7.5pt; border-top: 1px solid #000; padding-top: 4px; margin-top: 14px; }
+                    .bl_custom_report .bl-footer-legal td { padding: 0 4px; }
                 </style>
 
                 <!-- Issuer (left) / logo (right) -->
@@ -160,13 +161,14 @@
                     </table>
 
                     <!-- Legal footer -->
-                    <div class="bl-footer-legal">
-                        <t t-if="company.report_footer" t-out="company.report_footer"/>
-                        <t t-else="">
-                            <span t-if="company.partner_id.company_registry">N° Siret : <t t-out="company.partner_id.company_registry"/></span>
-                            <span t-if="company.vat">&#160;&#160;&#160;N° TVA IntraComm : <t t-out="company.vat"/></span>
-                        </t>
-                    </div>
+                    <table class="bl-footer-legal">
+                        <tr>
+                            <td style="text-align: left;">SAS au Capital de 22 860€</td>
+                            <td style="text-align: center;">N° Siret : <span t-out="company.partner_id.company_registry or ''"/></td>
+                            <td style="text-align: center;">N° TVA IntraComm : <span t-out="company.vat or ''"/></td>
+                            <td style="text-align: right;">N.A.F. : 2611Z</td>
+                        </tr>
+                    </table>
                 </div>
             </div>
         </t>
