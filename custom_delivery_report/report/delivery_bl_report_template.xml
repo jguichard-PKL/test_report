@@ -17,7 +17,7 @@
         <t t-call="web.basic_layout">
             <div class="bl_custom_report">
                 <style>
-                    .bl_custom_report { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; display: flex; flex-direction: column; min-height: 260mm; }
+                    .bl_custom_report { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; }
                     .bl_custom_report table { border-collapse: collapse; width: 100%; }
                     .bl_custom_report .text-end { text-align: right; }
                     .bl_custom_report .text-center { text-align: center; }
@@ -30,7 +30,6 @@
                     .bl_custom_report .bl-items { margin-top: 18px; }
                     .bl_custom_report .bl-items th, .bl_custom_report .bl-items td { border: 1px solid #000; padding: 3px 5px; vertical-align: top; }
                     .bl_custom_report .bl-items th { font-weight: bold; text-align: center; }
-                    .bl_custom_report .bl-spacer { flex: 1 1 auto; }
                 </style>
 
                 <!-- Issuer (left) / logo (right) -->
@@ -143,9 +142,7 @@
                     </tbody>
                 </table>
 
-                <div class="bl-spacer"/>
-
-                <div class="footer" style="margin-top: 20px;">
+                <div class="footer">
                     <!-- Total footer-->
                     <table class="bl-total-box" style="border: 1px solid #000; border-collapse: collapse; width: 100%; font-weight: bold;">
                         <tr>
