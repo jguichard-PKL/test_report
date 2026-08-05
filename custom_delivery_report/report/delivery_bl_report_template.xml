@@ -17,11 +17,11 @@
         <t t-call="web.basic_layout">
             <div class="bl_custom_report">
                 <style>
-                    .bl_custom_report { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; display: flex; flex-direction: column; min-height: 272mm; }
+                    .bl_custom_report { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; display: flex; flex-direction: column; min-height: 272mm; }
                     .bl_custom_report table { border-collapse: collapse; width: 100%; }
                     .bl_custom_report .text-end { text-align: right; }
                     .bl_custom_report .text-center { text-align: center; }
-                    .bl_custom_report .bl-title { font-size: 20pt; font-weight: bold; margin: 18px 0 12px 0; }
+                    .bl_custom_report .bl-title { font-size: 18pt; font-weight: bold; margin: 18px 0 12px 0; }
                     .bl_custom_report .bl-page-num { text-align: right; font-size: 9pt; margin-top: 6px; }
                     .bl_custom_report .bl-box { border: 1px solid #000; padding: 4px 6px; }
                     .bl_custom_report .bl-box-header { text-align: center; font-weight: bold; border-bottom: 1px solid #000; margin: -4px -6px 4px -6px; padding: 3px; }
@@ -47,6 +47,7 @@
                                 <span t-out="company.zip"/> <span t-out="company.city"/>
                             </div>
                             <div t-if="company.phone">Tel <span t-out="company.phone"/></div>
+                            <div>Fax +33 5 62 74 35 91</div>
                         </td>
                         <td style="width: 45%; vertical-align: top; text-align: right;">
                             <img t-if="company.logo" t-att-src="image_data_uri(company.logo)" style="max-height: 70px; max-width: 100%;"/>
@@ -147,7 +148,7 @@
 
                 <div class="bl-spacer"/>
 
-                <!-- Total -->
+                <!-- Total footer-->
                 <table class="bl-total-box">
                     <tr>
                         <td style="width: 50%; text-align: left;">Total Bon de Livraison N° <span t-out="doc.name"/></td>
