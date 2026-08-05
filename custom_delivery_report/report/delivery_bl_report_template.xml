@@ -30,7 +30,6 @@
                     .bl_custom_report .bl-items { margin-top: 18px; }
                     .bl_custom_report .bl-items th, .bl_custom_report .bl-items td { border: 1px solid #000; padding: 3px 5px; vertical-align: top; }
                     .bl_custom_report .bl-items th { font-weight: bold; text-align: center; }
-                    .bl_custom_report .bl-footer { flex: 1 1 auto; }
                     .bl_custom_report .bl-total-box { border: 1px solid #000; font-weight: bold; margin-top: 20px; }
                     .bl_custom_report .bl-total-box td { padding: 6px 8px; }
                     .bl_custom_report .bl-footer-legal { font-size: 7.5pt; border-top: 1px solid #000; padding-top: 4px; margin-top: 14px; text-align: center; }
