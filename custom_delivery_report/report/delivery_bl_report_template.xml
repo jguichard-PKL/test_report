@@ -148,30 +148,31 @@
 
                 <div class="footer"/>
                 
-                <style>
-                    .footer { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; }
-                    .footer table { border-collapse: collapse; width: 100%; }
-                    .footer .bl-total-box { border: 1px solid #000; font-weight: bold; }
-                    .footer .bl-total-box td { padding: 6px 8px; }
-                    .footer .bl-footer-legal { font-size: 7.5pt; border-top: 1px solid #000; padding-top: 4px; margin-top: 14px; text-align: center; }
-                </style>
+                    <style>
+                        .footer { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; }
+                        .footer table { border-collapse: collapse; width: 100%; }
+                        .footer .bl-total-box { border: 1px solid #000; font-weight: bold; }
+                        .footer .bl-total-box td { padding: 6px 8px; }
+                        .footer .bl-footer-legal { font-size: 7.5pt; border-top: 1px solid #000; padding-top: 4px; margin-top: 14px; text-align: center; }
+                    </style>
 
-                <!-- Total footer-->
-                <table class="bl-total-box">
-                    <tr>
-                        <td style="width: 50%; text-align: left;">Total Bon de Livraison N° <span t-out="doc.name"/></td>
-                        <td style="width: 25%; text-align: center;" t-out="'%.2f' % doc.bl_get_total_qty()"/>
-                        <td style="width: 25%; text-align: right;" t-out="'%.2f' % doc.bl_get_total_amount()"/>
-                    </tr>
-                </table>
+                    <!-- Total footer-->
+                    <table class="bl-total-box">
+                        <tr>
+                            <td style="width: 50%; text-align: left;">Total Bon de Livraison N° <span t-out="doc.name"/></td>
+                            <td style="width: 25%; text-align: center;" t-out="'%.2f' % doc.bl_get_total_qty()"/>
+                            <td style="width: 25%; text-align: right;" t-out="'%.2f' % doc.bl_get_total_amount()"/>
+                        </tr>
+                    </table>
 
-                <!-- Legal footer -->
-                <div class="bl-footer-legal">
-                    <t t-if="company.report_footer" t-out="company.report_footer"/>
-                    <t t-else="">
-                        <span t-if="company.partner_id.company_registry">N° Siret : <t t-out="company.partner_id.company_registry"/></span>
-                        <span t-if="company.vat">&#160;&#160;&#160;N° TVA IntraComm : <t t-out="company.vat"/></span>
-                    </t>
+                    <!-- Legal footer -->
+                    <div class="bl-footer-legal">
+                        <t t-if="company.report_footer" t-out="company.report_footer"/>
+                        <t t-else="">
+                            <span t-if="company.partner_id.company_registry">N° Siret : <t t-out="company.partner_id.company_registry"/></span>
+                            <span t-if="company.vat">&#160;&#160;&#160;N° TVA IntraComm : <t t-out="company.vat"/></span>
+                        </t>
+                    </div>
                 </div>
             </div>
         </t>
