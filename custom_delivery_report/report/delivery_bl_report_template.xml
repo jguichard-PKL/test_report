@@ -150,7 +150,6 @@
                 
                     <style>
                         html, body { height: 100%; margin: 0; padding: 0; }
-                        #minimal_layout_report_footers { position: relative; height: 100%; }
                         .footer { position: absolute; bottom: 0; left: 0;right: 0;font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; }
                         .footer table { border-collapse: collapse; width: 100%; }
                         .footer .bl-total-box { border: 1px solid #000; font-weight: bold; }
