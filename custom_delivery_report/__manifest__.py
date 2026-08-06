@@ -1,6 +1,6 @@
 {
     'name': "Custom Delivery Slip Report",
-    'summary': "Bon de Livraison report reproducing a client-provided layout, with pricing from the linked sale order.",
+    'summary': "Bon de Livraison reproducing a client-provided layout, with pricing and other info from the linked sale order.",
     'description': """
 Custom Delivery Slip (Bon de Livraison) report for stock.picking.
 
