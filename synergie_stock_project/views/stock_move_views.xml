@@ -17,12 +17,19 @@
 
     <!-- Formulaire "Move Detail" (popup ouverte via l'icône "Show details" sur
          une ligne de l'onglet Opérations d'un transfert) : project_id doit y
-         être présent, même invisible, pour être résolvable en tant que
-         'parent.project_id' dans le domaine du champ quant_id de la liste
-         move_line_ids qu'il embarque (cf. stock_move_line_views.xml). Sans ce
-         champ chargé sur ce formulaire précis, le domaine ne filtrait jamais
-         (parent.project_id non résolu = toujours absent), même avec un
-         mouvement correctement projeté.
+         être présent pour être résolvable en tant que 'parent.project_id'
+         dans le domaine du champ quant_id de la liste move_line_ids qu'il
+         embarque (cf. stock_move_line_views.xml). Sans ce champ chargé sur ce
+         formulaire précis, le domaine ne filtrait jamais (parent.project_id
+         non résolu = toujours absent), même avec un mouvement correctement
+         projeté.
+
+         [DEBUG TEMPORAIRE] Champ laissé VISIBLE (pas de invisible="1") pour
+         faciliter la vérification manuelle de la valeur stockée pendant les
+         tests en cours. À repasser en invisible="1" une fois le diagnostic
+         terminé — la présence du champ suffit pour que le domaine fonctionne,
+         la visibilité n'est qu'un confort de debug.
+
          [À vérifier v19] id de vue : stock.view_stock_move_operations. -->
     <record id="view_stock_move_operations_project" model="ir.ui.view">
         <field name="name">stock.move.operations.form.project</field>
@@ -30,7 +37,7 @@
         <field name="inherit_id" ref="stock.view_stock_move_operations"/>
         <field name="arch" type="xml">
             <field name="location_dest_id" position="after">
-                <field name="project_id" invisible="1"/>
+                <field name="project_id"/>
             </field>
         </field>
     </record>
