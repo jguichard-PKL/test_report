@@ -134,29 +134,40 @@ stockout standard Odoo (le mouvement reste `confirmed`/`waiting` ou passe
 `partially_available`) : **pas d'erreur, jamais de réservation d'un lot hors
 projet**.
 
-### 5.1 Chemin MTO (mouvement chaîné) : hors périmètre, décision volontaire
+### 5.1 Chemin MTO (mouvement chaîné) : couvert pour tout mouvement projeté
 
 `_update_reserved_quantity()` (§5) n'est appelée par `_action_assign()` que
 sur le chemin **MTS** (mouvement sans `move_orig_ids`). Un mouvement
-**chaîné** (`move_orig_ids` renseigné — réapprovisionnement interne
-multi-étapes, flux de sous-traitance) suit une branche entièrement
+**chaîné** (`move_orig_ids` renseigné) suit une branche entièrement
 différente : `_action_assign()` y appelle directement
 `_update_reserved_quantity_vals()` sur les (emplacement, lot, colis,
 propriétaire) renvoyés par `stock.move._get_available_move_lines()`, **sans
-repasser par la recherche de quants** — notre filtre ne s'y déclenche donc
-jamais, quel que soit l'état de `project_id` sur le mouvement.
+repasser par la recherche de quants** — le filtre du §5 ne s'y déclenche donc
+jamais tel quel.
 
-**Exclusion assumée**, tranchée côté Synergie : les mouvements chaînés (dont
-la sous-traitance) sont des mécaniques logistiques automatiques, pas des
-« prélèvements projet » au sens du besoin métier — au même titre que les
-réceptions, volontairement hors périmètre (§6). Aucune détection technique de
-la sous-traitance n'est faite dans le code : l'exclusion découle simplement
-du fait que ces mouvements sont chaînés, sans logique dédiée à ajouter ni à
-maintenir.
+Ce chemin est très concret chez Synergie : sur une route de fabrication
+**« Prélever composants puis fabriquer »**, le mouvement de consommation réel
+d'un composant (`raw_material_production_id`) est chaîné, alimenté par le
+transfert de préparation des composants — c'est **le scénario métier
+central** du module (wafer → rawline → tested goods, où chaque étape
+consomme un article générique commun à tous les projets ; seul le lot/projet
+distingue quelle pièce piocher). Sans couverture de ce chemin, un OF projeté
+pourrait hériter du composant préparé pour un **autre** projet.
 
-⚠️ Un mouvement chaîné peut donc afficher « Disponible » et hériter d'un lot
-d'un autre projet (ou sans projet), même si son propre `project_id` est
-renseigné. C'est le comportement voulu, pas un bug résiduel.
+**Portée retenue** : `stock.move._get_available_move_lines()` est surchargée
+pour filtrer les lots hérités du mouvement amont, pour **tout mouvement
+portant un `project_id`** — OF (consommation en une étape via
+`_update_reserved_quantity`, ou chaînée via une route de préparation, couvert
+ici) comme simple transfert chaîné (réapprovisionnement interne multi-étapes,
+**sous-traitance incluse**). Décision tranchée côté Synergie : aucun critère
+technique fiable ne permettant de distinguer la sous-traitance des autres
+transferts sans code de détection dédié (écarté), ces flux sont traités
+comme tout autre mouvement projeté — ce qui a pour effet secondaire de les
+restreindre par projet également.
+
+Cette couverture rend le filtre robuste au réglage « Étapes de fabrication »
+de vos types d'opération (1, 2 ou 3 étapes) comme au nombre d'étapes de vos
+routes de transfert, sans avoir à les connaître précisément.
 
 ### 5.2 Sélection manuelle d'un quant (widget « Pick From »)
 
@@ -215,10 +226,10 @@ encore) n'est par nature liée à aucun quant existant — rien à filtrer.
 | Filtre / group_by par projet | ✅ | lots, mouvements, transferts, **stock disponible** |
 | Réception / livraison / transfert interne | ✅ | projet saisi sur le transfert (`stock.picking`, tout type) → mouvement → lot |
 | Réservation automatique par projet (MTS) | ✅ | `_action_assign` (sans `move_orig_ids`) ne réserve que des lots du même projet |
-| Réservation MTO (mouvement chaîné, dont sous-traitance) | ➖ hors périmètre (volontaire) | mécanique logistique automatique, pas un « prélèvement projet » (§5.1) |
+| Réservation MTO (mouvement chaîné, dont sous-traitance) | ✅ | `_get_available_move_lines()` filtre tout mouvement projeté (§5.1) |
 | Sélection manuelle d'un quant (widget « Pick From ») | ✅ | domaine du champ `quant_id` complété par projet (§5.2) |
 | Saisie d'un lot en texte libre (`lot_name`) | ➖ hors périmètre | pas de quant existant à filtrer (création de lot en réception) |
-| Composants consommés — réservation restreinte par projet | ✅ | `raw_material_production_id.project_id`, chemin MTS uniquement (§5) |
+| Composants consommés — réservation restreinte par projet | ✅ | `raw_material_production_id.project_id`, MTS **et** MTO (§5, §5.1) |
 | Composants consommés — propagation au lot | ➖ hors périmètre (volontaire) | jamais tamponnés (`_action_done` les exclut explicitement) |
 
 ## 7. Lien avec `synergie_mrp_performance`
@@ -248,8 +259,11 @@ Plusieurs points d'API sont marqués `# [À vérifier v19]` dans le code :
 - signature et valeur de retour de `stock.move._action_done()` ;
 - présence de `production_id` vs `raw_material_production_id` sur `stock.move` ;
 - valeur `picking_type_id.code == 'incoming'` pour détecter une réception ;
-- existence et signature de `stock.quant._get_gather_domain()` et de
-  `stock.move._update_reserved_quantity()` (mécanique de réservation, §5) ;
+- existence et signature de `stock.quant._get_gather_domain()`,
+  `stock.move._update_reserved_quantity()` et
+  `stock.move._get_available_move_lines()` (mécanique de réservation, §5,
+  §5.1) ; structure des clés retournées par cette dernière
+  (`(location_id, lot_id, package_id, owner_id)`, index 1 = lot) ;
 - identifiants et structure de `stock.view_stock_move_operations`,
   `stock.view_stock_move_line_operation_tree` et
   `stock.view_stock_move_line_detailed_operation_tree`, présence du champ

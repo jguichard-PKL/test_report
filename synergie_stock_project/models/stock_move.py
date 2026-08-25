@@ -163,13 +163,14 @@ class StockMove(models.Model):
 
         Ne couvre PAS le chemin MTO (mouvement avec move_orig_ids, cf.
         _action_assign, branche qui appelle _update_reserved_quantity_vals
-        directement sur les lots renvoyés par _get_available_move_lines) —
-        **décision volontaire**, pas une limite technique : les mouvements
-        chaînés (réapprovisionnements internes multi-étapes, flux de
-        sous-traitance) sont des mécaniques logistiques automatiques, pas des
-        "prélèvements projet" au sens du besoin métier. Un mouvement
-        chaîné hérite donc du/des lot(s) apporté(s) par son mouvement amont
-        sans filtrage par projet, quel que soit son propre project_id.
+        directement sur les lots renvoyés par _get_available_move_lines) : ce
+        chemin ne recherche pas de nouveaux quants, donc ce filtre-ci ne s'y
+        déclenche jamais. Couvert séparément par _get_available_move_lines()
+        ci-dessous, pour TOUT mouvement projeté (OF ou non) — décision
+        tranchée côté Synergie : un transfert chaîné sans lien OF (réception
+        exceptée, hors périmètre par nature) doit lui aussi être restreint par
+        projet, y compris la sous-traitance (aucun critère technique fiable ne
+        permettant de l'exclure spécifiquement sans code dédié, écarté).
 
         Si aucun quant ne correspond au projet (chemin MTS), la réservation
         prend 0 (comme un stockout standard Odoo) : le mouvement reste
@@ -184,3 +185,43 @@ class StockMove(models.Model):
         return super(StockMove, self.with_context(restrict_project_id=self.project_id.id))._update_reserved_quantity(
             need, location_id, lot_id=lot_id, package_id=package_id, owner_id=owner_id, strict=strict
         )
+
+    def _get_available_move_lines(self, assigned_moves_ids, partially_available_moves_ids):
+        """Restreint au projet du mouvement les lots hérités d'un mouvement
+        amont (chemin MTO/chaîné), pour TOUT mouvement portant un projet.
+
+        _update_reserved_quantity() ci-dessus ne couvre que le chemin MTS.
+        Un mouvement chaîné (move_orig_ids renseigné) suit une branche
+        entièrement différente dans _action_assign() : celle-ci appelle
+        directement _update_reserved_quantity_vals() sur les (emplacement,
+        lot, colis, propriétaire) renvoyés PAR CETTE méthode, sans repasser
+        par la recherche de quants. C'est donc ici, et seulement ici, que ce
+        chemin peut être filtré.
+
+        Portée volontaire : s'applique à tout mouvement projeté, qu'il soit
+        lié à un OF (consommation de composants via une route "Prélever
+        composants puis fabriquer" — le scénario métier central : plusieurs
+        projets consomment un même article générique à une même étape, seul
+        le lot/projet distingue quelle pièce piocher) ou à un simple
+        transfert chaîné (réapprovisionnement interne multi-étapes, flux de
+        sous-traitance inclus). Décision tranchée côté Synergie : aucun
+        critère technique fiable ne permettant de distinguer la sous-traitance
+        des autres transferts sans écrire de détection dédiée (écarté), ces
+        flux sont traités comme tout autre mouvement projeté.
+
+        Sans projet sur le mouvement : comportement standard, aucun filtre.
+        Comme pour la réservation directe, on exclut aussi les lots sans
+        projet (clé sans lot_id) : un mouvement projeté ne doit hériter que
+        de lots du même projet, jamais de lots "orphelins".
+        """
+        self.ensure_one()
+        available_move_lines = super()._get_available_move_lines(
+            assigned_moves_ids, partially_available_moves_ids
+        )
+        if not self.project_id:
+            return available_move_lines
+        return {
+            key: quantity
+            for key, quantity in available_move_lines.items()
+            if key[1] and key[1].project_id == self.project_id
+        }
