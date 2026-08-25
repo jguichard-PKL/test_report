@@ -28,8 +28,9 @@ surcharge de la validation des lignes de mouvement.
    de toutes les transactions de stock. Champ calculé (`_compute_project_id`)
    `store=True, readonly=False` : auto-renseigné mais modifiable manuellement.
    - Mouvement de **sortie d'un OF** (`production_id`) → `production_id.project_id`.
-   - **Réception** (`picking_type_id.code == 'incoming'`) → hook
-     `_get_reception_project()` → `picking_id.project_id` (cf. §4).
+   - **Transfert portant un projet** (`picking_id.project_id`, tout type —
+     réception, livraison, interne) → hook `_get_picking_project()` →
+     `picking_id.project_id` (cf. §4).
    - Sinon → la valeur courante est conservée (saisie manuelle possible),
      jamais forcée à `False`.
    - Les **composants consommés** (`raw_material_production_id`) ne sont
@@ -71,26 +72,37 @@ justifie :
   concurrents sur un même lot, donc le garde-fou « ne pas écraser » est
   suffisant et sûr.
 
-## 4. Source projet en RÉCEPTION (tranchée)
+## 4. Source projet portée par le TRANSFERT (réception, livraison, interne)
 
 Pour les flux **OF**, la source est le document OF (`mrp.production.project_id`).
-Pour les **réceptions** (entrée de wafer, rowlines OSAT, achats), la source a été
-**tranchée côté Synergie : le projet est SAISI sur le transfert**
+Pour **tout transfert** (réception, livraison, transfert interne), la source a
+été **tranchée côté Synergie : le projet est SAISI sur le transfert**
 (`stock.picking.project_id`) — miroir exact du modèle OF (projet porté par le
 document).
 
+⚠️ **Historique** : ce mécanisme ne couvrait initialement que les réceptions
+(`picking_type_id.code == 'incoming'`). Élargi à tout type de picking après un
+cas réel en test : une **livraison** sortante portant un projet sur le picking
+ne le propageait pas à ses mouvements (le compute ne regardait que les
+réceptions), donc la réservation restreinte par projet (§5) ne se déclenchait
+jamais sur ce flux — la disponibilité restait calculée sans aucun filtre. Le
+champ `stock.picking.project_id` est bien le même sur tous les types de
+transfert ; c'est la **propagation vers le mouvement** qui était trop étroite.
+
 Mécanique :
-- Champ `project_id` ajouté sur `stock.picking`, saisi sur le bon de réception.
-- Le hook `stock.move._get_reception_project()` renvoie `picking_id.project_id`.
+- Champ `project_id` ajouté sur `stock.picking`, saisi sur le transfert (tout
+  type).
+- Le hook `stock.move._get_picking_project()` renvoie `picking_id.project_id`.
 - Le compute de `stock.move.project_id` dépend de `picking_id.project_id` : le
   mouvement se met à jour dès que le projet est posé/modifié sur le transfert.
-- À la validation, le projet est propagé au(x) lot(s) reçu(s) (mécanique §2.2).
+- À la validation, le projet est propagé au(x) lot(s) mouvementé(s) (mécanique
+  §2.2) — en réception comme en livraison.
 
 Aucune dépendance `purchase_stock` requise : marche aussi pour les réceptions
 **sans commande d'achat** (retours OSAT, etc.).
 
 Le hook reste **surchargeable** : brancher une autre source (commande d'achat…)
-se fait en redéfinissant `_get_reception_project()`, sans toucher au compute.
+se fait en redéfinissant `_get_picking_project()`, sans toucher au compute.
 
 ## 5. Réservation restreinte au projet
 
@@ -156,7 +168,7 @@ encore) n'est par nature liée à aucun quant existant — rien à filtrer.
 | OF — fails (sous-produits lot-trackés) | ✅ | idem sous-produits |
 | Lot déjà rattaché à un projet | ✅ | **jamais écrasé** |
 | Filtre / group_by par projet | ✅ | lots, mouvements, transferts, **stock disponible** |
-| Réception (entrée de stock) | ✅ | projet saisi sur le transfert (`stock.picking`) → mouvement → lot |
+| Réception / livraison / transfert interne | ✅ | projet saisi sur le transfert (`stock.picking`, tout type) → mouvement → lot |
 | Réservation automatique par projet | ✅ | `_action_assign` (MTS) ne réserve que des lots du même projet |
 | Sélection manuelle d'un quant (widget « Pick From ») | ✅ | domaine du champ `quant_id` complété par projet (§5.1) |
 | Réservation MTO (mouvement chaîné) | ➖ hors périmètre | hérite du filtrage du mouvement amont, pas de re-filtrage |

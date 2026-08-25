@@ -17,8 +17,8 @@ Principes :
 - Il est exposé sur le stock disponible (stock.quant) en related stocké pour
   filtrer / grouper le stock par projet.
 
-Voir le README pour la décision d'architecture et le point ouvert sur la
-source du projet en RÉCEPTION (hook _get_reception_project à compléter).
+Voir le README pour la décision d'architecture et le hook surchargeable de
+source projet sur transfert (_get_picking_project).
     """,
     "author": "Peaklane",
     "website": "https://www.peaklane.fr",
@@ -26,8 +26,9 @@ source du projet en RÉCEPTION (hook _get_reception_project à compléter).
     "category": "Inventory/Inventory",
     # 'mrp' : source projet pour les flux de fabrication (mrp.production.project_id).
     # 'project' : modèle cible project.project.
-    # Source projet en réception : tranchée = saisie sur le transfert
-    # (stock.picking.project_id). Pas de dépendance 'purchase_stock' nécessaire.
+    # Source projet sur transfert (réception, livraison, interne) : tranchée =
+    # saisie sur le picking (stock.picking.project_id). Pas de dépendance
+    # 'purchase_stock' nécessaire.
     "depends": ["stock", "mrp", "project"],
     "data": [
         "views/stock_picking_views.xml",

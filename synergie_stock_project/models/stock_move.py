@@ -36,8 +36,6 @@ class StockMove(models.Model):
     @api.depends(
         "production_id",
         "production_id.project_id",
-        "picking_type_id",
-        "picking_type_id.code",
         "picking_id",
         "picking_id.project_id",
     )
@@ -46,31 +44,28 @@ class StockMove(models.Model):
             if move.production_id:
                 # Mouvement de sortie d'un OF (fini, sous-produit, fail).
                 move.project_id = move.production_id.project_id
-            elif move._is_incoming_reception():
-                # Réception (bumping, rowlines OSAT, achats).
-                move.project_id = move._get_reception_project()
+            elif move.picking_id.project_id:
+                # Transfert portant un projet : réception, livraison ou
+                # transfert interne (élargi à tout type de picking, pas
+                # seulement 'incoming' — une livraison dont le picking porte
+                # un projet doit aussi tamponner ses mouvements, sans quoi la
+                # réservation restreinte par projet ne se déclenche jamais
+                # sur ce flux).
+                move.project_id = move._get_picking_project()
             else:
                 # Tout autre mouvement : on conserve la valeur courante
                 # (saisie manuelle possible), on ne force pas à False.
                 move.project_id = move.project_id
 
-    def _is_incoming_reception(self):
-        """Vrai si le mouvement est une réception (flux entrant).
-
-        On s'appuie sur picking_type_id.code == 'incoming' (champ cœur stable)
-        plutôt que sur une comparaison d'emplacements, pour rester robuste aux
-        configurations multi-entrepôts.
-        """
-        self.ensure_one()
-        return self.picking_type_id.code == "incoming"
-
-    def _get_reception_project(self):
-        """Hook : projet à appliquer aux mouvements de RÉCEPTION.
+    def _get_picking_project(self):
+        """Hook : projet à appliquer aux mouvements d'un TRANSFERT.
 
         Source tranchée côté Synergie : le projet est SAISI sur le transfert
         (stock.picking.project_id), miroir du modèle OF où le projet est porté
-        par le document (mrp.production). Le mouvement le récupère ici, puis il
-        est propagé au lot à la validation.
+        par le document (mrp.production). Vaut pour tout type de picking
+        (réception, livraison, interne) dès lors que le picking porte un
+        projet ; le mouvement le récupère ici, puis il est propagé au lot à
+        la validation.
 
         Reste un hook surchargeable : une autre source (commande d'achat, etc.)
         pourrait être branchée ici sans toucher au compute.
