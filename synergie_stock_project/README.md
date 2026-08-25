@@ -121,10 +121,31 @@ projet**.
 renseigné) réutilise les lots déjà réservés par le mouvement amont sans
 nouvelle recherche de quants — aucun trou tant que ce mouvement amont porte
 lui-même le bon projet (cas normal, le projet est porté de bout en bout par
-la chaîne). La sélection **manuelle** d'un lot sur une ligne de mouvement
-(saisie directe dans `move_line_ids.lot_id`) n'est pas bridée par un domaine
-de vue : la restriction porte sur la réservation **automatique**, pas sur la
-correction manuelle.
+la chaîne).
+
+### 5.1 Sélection manuelle d'un quant (widget « Pick From »)
+
+La réservation automatique (`_action_assign`) n'est pas le seul chemin pour
+choisir un lot : le champ `quant_id` (widget `pick_from`) sur
+`stock.move.line` permet à un utilisateur de choisir **manuellement** un
+quant précis (opérations détaillées, ligne du formulaire de mouvement). Ce
+sélecteur **ne passe pas** par `_action_assign` / `_get_gather_domain` — il
+interroge `stock.quant` via un domaine posé en dur dans deux vues cœur
+(`stock.view_stock_move_line_operation_tree` et
+`stock.view_stock_move_line_detailed_operation_tree`), filtré uniquement par
+produit et emplacement. **Sans correctif, ce sélecteur listait des lots de
+tous les projets**, contournant entièrement la restriction du §5.
+
+Corrigé par héritage de ces deux vues
+([stock_move_line_views.xml](views/stock_move_line_views.xml)) : le domaine
+du champ `quant_id` est complété avec `lot_id.project_id = <projet du
+mouvement>` quand le mouvement (ou la ligne, selon la vue) porte un projet.
+Sans projet sur le mouvement, aucune restriction (comportement standard
+conservé).
+
+**Reste hors périmètre** : la saisie manuelle d'un **numéro de lot en texte
+libre** (champ `lot_name`, utilisé en réception quand le lot n'existe pas
+encore) n'est par nature liée à aucun quant existant — rien à filtrer.
 
 ## 6. Périmètre couvert / non couvert
 
@@ -137,8 +158,9 @@ correction manuelle.
 | Filtre / group_by par projet | ✅ | lots, mouvements, transferts, **stock disponible** |
 | Réception (entrée de stock) | ✅ | projet saisi sur le transfert (`stock.picking`) → mouvement → lot |
 | Réservation automatique par projet | ✅ | `_action_assign` (MTS) ne réserve que des lots du même projet |
+| Sélection manuelle d'un quant (widget « Pick From ») | ✅ | domaine du champ `quant_id` complété par projet (§5.1) |
 | Réservation MTO (mouvement chaîné) | ➖ hors périmètre | hérite du filtrage du mouvement amont, pas de re-filtrage |
-| Sélection manuelle d'un lot | ➖ hors périmètre | pas de domaine de vue, correction libre assumée |
+| Saisie d'un lot en texte libre (`lot_name`) | ➖ hors périmètre | pas de quant existant à filtrer (création de lot en réception) |
 | Composants consommés | ➖ hors périmètre | volontairement non traités |
 
 ## 7. Lien avec `synergie_mrp_performance`
@@ -170,6 +192,10 @@ Plusieurs points d'API sont marqués `# [À vérifier v19]` dans le code :
 - valeur `picking_type_id.code == 'incoming'` pour détecter une réception ;
 - existence et signature de `stock.quant._get_gather_domain()` et de
   `stock.move._update_reserved_quantity()` (mécanique de réservation, §5) ;
+- identifiants et structure de `stock.view_stock_move_line_operation_tree` et
+  `stock.view_stock_move_line_detailed_operation_tree`, présence du champ
+  `quant_id` (widget `pick_from`) et de ses variables de domaine
+  (`parent.location_id`, `picking_location_id`) — cf. §5.1 ;
 - identifiants externes des vues héritées (`stock.view_production_lot_form`,
   `stock.view_picking_form`, `stock.view_picking_internal_search`, etc.) et
   l'ancre `origin` sur le formulaire de transfert.

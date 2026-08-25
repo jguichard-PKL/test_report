@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Sélecteur manuel de quant ("Pick From", champ quant_id, widget
+         pick_from) sur la ligne de mouvement intégrée au formulaire du
+         mouvement (move_line_ids). Sans ce correctif, ce sélecteur liste
+         TOUS les quants du produit/emplacement, tous projets confondus :
+         il contourne entièrement le filtrage posé côté réservation
+         automatique (cf. stock_move.py _update_reserved_quantity /
+         stock_quant.py _get_gather_domain), car il ne passe pas par
+         _action_assign. On étend donc ici le domaine déjà présent sur ce
+         champ (produit + emplacement) avec le projet du mouvement.
+
+         Sans projet sur le mouvement : aucune restriction (comportement
+         standard conservé), cohérent avec le reste du module.
+
+         [À vérifier v19] id de vue : stock.view_stock_move_line_operation_tree.
+         'parent' résout ici vers stock.move : ce champ est utilisé via
+         move_line_ids, embarqué dans stock.view_move_form (cf. contexte
+         list_view_ref sur ce champ dans stock/views/stock_move_views.xml). -->
+    <record id="view_stock_move_line_operation_tree_project" model="ir.ui.view">
+        <field name="name">stock.move.line.operations.list.project</field>
+        <field name="model">stock.move.line</field>
+        <field name="inherit_id" ref="stock.view_stock_move_line_operation_tree"/>
+        <field name="arch" type="xml">
+            <field name="quant_id" position="attributes">
+                <attribute name="domain">[('product_id', '=', product_id), ('location_id', 'child_of', parent.location_id)] + ([('lot_id.project_id', '=', parent.project_id)] if parent.project_id else [])</attribute>
+            </field>
+        </field>
+    </record>
+
+    <!-- Même sélecteur, sur la liste "Opérations détaillées" ouverte en
+         standalone par le bouton "Moves" du transfert
+         (stock.picking.action_detailed_operations()). Pas de 'parent' ici :
+         cette vue est ouverte directement sur stock.move.line, pas imbriquée
+         dans un formulaire parent. On retraverse donc via move_id, déjà
+         chargé en colonne invisible sur cette même vue.
+
+         [À vérifier v19] id de vue : stock.view_stock_move_line_detailed_operation_tree. -->
+    <record id="view_stock_move_line_detailed_operation_tree_project" model="ir.ui.view">
+        <field name="name">stock.move.line.operations.detailed.list.project</field>
+        <field name="model">stock.move.line</field>
+        <field name="inherit_id" ref="stock.view_stock_move_line_detailed_operation_tree"/>
+        <field name="arch" type="xml">
+            <field name="quant_id" position="attributes">
+                <attribute name="domain">[('product_id', '=', product_id), ('location_id', 'child_of', picking_location_id)] + ([('lot_id.project_id', '=', move_id.project_id)] if move_id.project_id else [])</attribute>
+            </field>
+        </field>
+    </record>
+
+</odoo>
