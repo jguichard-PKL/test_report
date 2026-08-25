@@ -31,11 +31,20 @@ class StockMove(models.Model):
     # [À vérifier v19] : sur stock.move, les mouvements de SORTIE d'un OF (produit
     # fini, sous-produits, fails) portent 'production_id', tandis que les
     # mouvements de CONSOMMATION de composants portent 'raw_material_production_id'.
-    # On ne dépend volontairement que de 'production_id' : les composants
-    # consommés ne doivent pas re-tamponner les lots déjà existants.
+    #
+    # Les deux alimentent project_id (besoin : la consommation de composants
+    # "pioche" elle aussi dans le stock, sa réservation doit donc être
+    # restreinte par projet, §5). MAIS ce n'est pas symétrique pour autant :
+    # _action_done() (plus bas) exclut explicitement raw_material_production_id
+    # de la propagation au lot — un composant consommé ne doit jamais être
+    # re-tamponné avec le projet de l'OF qui le consomme (lot potentiellement
+    # générique/partagé entre plusieurs projets). project_id sert donc ici
+    # UNIQUEMENT à restreindre la réservation pour ces mouvements-là.
     @api.depends(
         "production_id",
         "production_id.project_id",
+        "raw_material_production_id",
+        "raw_material_production_id.project_id",
         "picking_id",
         "picking_id.project_id",
     )
@@ -44,6 +53,11 @@ class StockMove(models.Model):
             if move.production_id:
                 # Mouvement de sortie d'un OF (fini, sous-produit, fail).
                 move.project_id = move.production_id.project_id
+            elif move.raw_material_production_id:
+                # Consommation de composants : projet de l'OF, pour la
+                # réservation uniquement (jamais propagé au lot, cf.
+                # _action_done ci-dessous).
+                move.project_id = move.raw_material_production_id.project_id
             elif move.picking_id.project_id:
                 # Transfert portant un projet : réception, livraison ou
                 # transfert interne (élargi à tout type de picking, pas
@@ -92,6 +106,13 @@ class StockMove(models.Model):
         Cohérent avec l'hypothèse lot mono-projet : la première écriture suffit,
         aucun arbitrage, jamais d'écrasement.
 
+        Exclusion volontaire : les mouvements de CONSOMMATION de composants
+        (raw_material_production_id) portent désormais un project_id (cf.
+        _compute_project_id, pour restreindre leur réservation), mais ne
+        doivent JAMAIS tamponner le lot consommé — un composant peut être
+        générique/partagé entre projets, contrairement au produit fini/
+        sous-produit/fail qui, lui, EST le résultat de l'OF projeté.
+
         [À vérifier v19] : _action_done renvoie le recordset des mouvements
         réellement validés (peut différer de self après fusion/backorder) ; on
         itère donc sur la valeur de retour, pas sur self. Signature reprise en
@@ -100,6 +121,8 @@ class StockMove(models.Model):
         moves_done = super()._action_done(*args, **kwargs)
         stamped_lots = self.env["stock.lot"]
         for move in moves_done:
+            if move.raw_material_production_id:
+                continue
             project = move.project_id
             if not project:
                 continue
@@ -138,16 +161,20 @@ class StockMove(models.Model):
         Sans projet sur le mouvement (project_id vide) : comportement standard
         Odoo inchangé, aucun filtre.
 
-        [À vérifier v19] Ne couvre pas le chemin MTO (mouvement avec
-        move_orig_ids, cf. _action_assign, branche `_update_reserved_quantity_vals`
-        appelée directement) : ce chemin réutilise les lots déjà réservés par le
-        mouvement amont, sans nouvelle recherche de quants. Aucun trou de filtrage
-        tant que ce mouvement amont porte lui-même le bon project_id (cas normal :
-        le projet est porté de bout en bout par la chaîne de transferts/OF).
+        Ne couvre PAS le chemin MTO (mouvement avec move_orig_ids, cf.
+        _action_assign, branche qui appelle _update_reserved_quantity_vals
+        directement sur les lots renvoyés par _get_available_move_lines) —
+        **décision volontaire**, pas une limite technique : les mouvements
+        chaînés (réapprovisionnements internes multi-étapes, flux de
+        sous-traitance) sont des mécaniques logistiques automatiques, pas des
+        "prélèvements projet" au sens du besoin métier. Un mouvement
+        chaîné hérite donc du/des lot(s) apporté(s) par son mouvement amont
+        sans filtrage par projet, quel que soit son propre project_id.
 
-        Si aucun quant ne correspond au projet, la réservation prend 0 (comme un
-        stockout standard Odoo) : le mouvement reste 'confirmed'/'waiting' ou passe
-        'partially_available', sans erreur ni réservation d'un lot hors projet.
+        Si aucun quant ne correspond au projet (chemin MTS), la réservation
+        prend 0 (comme un stockout standard Odoo) : le mouvement reste
+        'confirmed'/'waiting' ou passe 'partially_available', sans erreur ni
+        réservation d'un lot hors projet.
         """
         self.ensure_one()
         if not self.project_id:

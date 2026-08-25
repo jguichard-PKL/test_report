@@ -28,19 +28,24 @@ surcharge de la validation des lignes de mouvement.
    de toutes les transactions de stock. Champ calculé (`_compute_project_id`)
    `store=True, readonly=False` : auto-renseigné mais modifiable manuellement.
    - Mouvement de **sortie d'un OF** (`production_id`) → `production_id.project_id`.
+   - Mouvement de **consommation de composants** (`raw_material_production_id`)
+     → `raw_material_production_id.project_id` — **uniquement pour restreindre
+     sa réservation** (§5) : ce mouvement-là "pioche" bien dans le stock, sa
+     réservation doit donc être contrainte au projet comme les autres flux
+     sortants. Il reste néanmoins **exclu de la propagation au lot** (point 2
+     ci-dessous) : un composant est potentiellement générique/partagé entre
+     projets, contrairement au produit qui sort de l'OF.
    - **Transfert portant un projet** (`picking_id.project_id`, tout type —
      réception, livraison, interne) → hook `_get_picking_project()` →
      `picking_id.project_id` (cf. §4).
    - Sinon → la valeur courante est conservée (saisie manuelle possible),
      jamais forcée à `False`.
-   - Les **composants consommés** (`raw_material_production_id`) ne sont
-     **volontairement pas** traités : ils ne doivent pas re-tamponner des lots
-     existants.
 
 2. **Propagation vers `stock.lot`** dans `stock.move._action_done()` :
-   après `super()`, pour chaque mouvement validé avec un `project_id` renseigné,
-   on parcourt ses `move_line_ids` et on écrit le projet sur tout `lot_id`
-   **encore vide**.
+   après `super()`, pour chaque mouvement validé avec un `project_id` renseigné
+   **et n'étant pas une consommation de composants** (`raw_material_production_id`
+   exclu explicitement — cf. point ci-dessus), on parcourt ses `move_line_ids`
+   et on écrit le projet sur tout `lot_id` **encore vide**.
    - **Jamais d'écrasement** d'un projet déjà posé.
    - Couvre d'un coup le **lot fini**, les **sous-produits** et les **fails**
      du même OF (tous portés par des mouvements à `project_id` renseigné).
@@ -129,13 +134,31 @@ stockout standard Odoo (le mouvement reste `confirmed`/`waiting` ou passe
 `partially_available`) : **pas d'erreur, jamais de réservation d'un lot hors
 projet**.
 
-**Hors périmètre** : le chemin MTO (mouvement chaîné, `move_orig_ids`
-renseigné) réutilise les lots déjà réservés par le mouvement amont sans
-nouvelle recherche de quants — aucun trou tant que ce mouvement amont porte
-lui-même le bon projet (cas normal, le projet est porté de bout en bout par
-la chaîne).
+### 5.1 Chemin MTO (mouvement chaîné) : hors périmètre, décision volontaire
 
-### 5.1 Sélection manuelle d'un quant (widget « Pick From »)
+`_update_reserved_quantity()` (§5) n'est appelée par `_action_assign()` que
+sur le chemin **MTS** (mouvement sans `move_orig_ids`). Un mouvement
+**chaîné** (`move_orig_ids` renseigné — réapprovisionnement interne
+multi-étapes, flux de sous-traitance) suit une branche entièrement
+différente : `_action_assign()` y appelle directement
+`_update_reserved_quantity_vals()` sur les (emplacement, lot, colis,
+propriétaire) renvoyés par `stock.move._get_available_move_lines()`, **sans
+repasser par la recherche de quants** — notre filtre ne s'y déclenche donc
+jamais, quel que soit l'état de `project_id` sur le mouvement.
+
+**Exclusion assumée**, tranchée côté Synergie : les mouvements chaînés (dont
+la sous-traitance) sont des mécaniques logistiques automatiques, pas des
+« prélèvements projet » au sens du besoin métier — au même titre que les
+réceptions, volontairement hors périmètre (§6). Aucune détection technique de
+la sous-traitance n'est faite dans le code : l'exclusion découle simplement
+du fait que ces mouvements sont chaînés, sans logique dédiée à ajouter ni à
+maintenir.
+
+⚠️ Un mouvement chaîné peut donc afficher « Disponible » et hériter d'un lot
+d'un autre projet (ou sans projet), même si son propre `project_id` est
+renseigné. C'est le comportement voulu, pas un bug résiduel.
+
+### 5.2 Sélection manuelle d'un quant (widget « Pick From »)
 
 La réservation automatique (`_action_assign`) n'est pas le seul chemin pour
 choisir un lot : le champ `quant_id` (widget `pick_from`) sur
@@ -191,11 +214,12 @@ encore) n'est par nature liée à aucun quant existant — rien à filtrer.
 | Lot déjà rattaché à un projet | ✅ | **jamais écrasé** |
 | Filtre / group_by par projet | ✅ | lots, mouvements, transferts, **stock disponible** |
 | Réception / livraison / transfert interne | ✅ | projet saisi sur le transfert (`stock.picking`, tout type) → mouvement → lot |
-| Réservation automatique par projet | ✅ | `_action_assign` (MTS) ne réserve que des lots du même projet |
-| Sélection manuelle d'un quant (widget « Pick From ») | ✅ | domaine du champ `quant_id` complété par projet (§5.1) |
-| Réservation MTO (mouvement chaîné) | ➖ hors périmètre | hérite du filtrage du mouvement amont, pas de re-filtrage |
+| Réservation automatique par projet (MTS) | ✅ | `_action_assign` (sans `move_orig_ids`) ne réserve que des lots du même projet |
+| Réservation MTO (mouvement chaîné, dont sous-traitance) | ➖ hors périmètre (volontaire) | mécanique logistique automatique, pas un « prélèvement projet » (§5.1) |
+| Sélection manuelle d'un quant (widget « Pick From ») | ✅ | domaine du champ `quant_id` complété par projet (§5.2) |
 | Saisie d'un lot en texte libre (`lot_name`) | ➖ hors périmètre | pas de quant existant à filtrer (création de lot en réception) |
-| Composants consommés | ➖ hors périmètre | volontairement non traités |
+| Composants consommés — réservation restreinte par projet | ✅ | `raw_material_production_id.project_id`, chemin MTS uniquement (§5) |
+| Composants consommés — propagation au lot | ➖ hors périmètre (volontaire) | jamais tamponnés (`_action_done` les exclut explicitement) |
 
 ## 7. Lien avec `synergie_mrp_performance`
 
@@ -226,10 +250,11 @@ Plusieurs points d'API sont marqués `# [À vérifier v19]` dans le code :
 - valeur `picking_type_id.code == 'incoming'` pour détecter une réception ;
 - existence et signature de `stock.quant._get_gather_domain()` et de
   `stock.move._update_reserved_quantity()` (mécanique de réservation, §5) ;
-- identifiants et structure de `stock.view_stock_move_line_operation_tree` et
+- identifiants et structure de `stock.view_stock_move_operations`,
+  `stock.view_stock_move_line_operation_tree` et
   `stock.view_stock_move_line_detailed_operation_tree`, présence du champ
   `quant_id` (widget `pick_from`) et de ses variables de domaine
-  (`parent.location_id`, `picking_location_id`) — cf. §5.1 ;
+  (`parent.location_id`, `picking_location_id`) — cf. §5.2 ;
 - identifiants externes des vues héritées (`stock.view_production_lot_form`,
   `stock.view_picking_form`, `stock.view_picking_internal_search`, etc.) et
   l'ancre `origin` sur le formulaire de transfert.
