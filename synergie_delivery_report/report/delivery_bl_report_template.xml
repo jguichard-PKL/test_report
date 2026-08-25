@@ -3,7 +3,7 @@
 
     <template id="report_delivery_bl_document">
         <t t-foreach="docs" t-as="o">
-            <t t-call="custom_delivery_report.report_delivery_bl_document_body" t-lang="o._get_report_lang()"/>
+            <t t-call="synergie_delivery_report.report_delivery_bl_document_body" t-lang="o._get_report_lang()"/>
         </t>
     </template>
 
@@ -55,12 +55,15 @@
                     <tr>
                         <td style="width: 55%; vertical-align: top;"/>
                         <td style="width: 45%; vertical-align: top;">
-                            <div style="font-weight: bold;" t-out="addressee.name"/>
-                            <div t-if="addressee.street" t-out="addressee.street"/>
-                            <div t-if="addressee.street2" t-out="addressee.street2"/>
                             <div>
-                                <span t-out="addressee.zip"/> <span t-out="addressee.city"/>
+                                <strong t-if="o.partner_id.commercial_partner_id.name" t-out="o.partner_id.commercial_partner_id.name"/><br/>
+                                <span t-if="o.partner_id.commercial_partner_id.street" t-out="o.partner_id.commercial_partner_id.street"/><br/>
+                                <span t-if="o.partner_id.commercial_partner_id.street2" t-out="o.partner_id.commercial_partner_id.street2"/><br/>
+                                <span t-if="o.partner_id.commercial_partner_id.zip" t-out="o.partner_id.commercial_partner_id.zip"/> 
+                                <span t-if="o.partner_id.commercial_partner_id.city" t-out="o.partner_id.commercial_partner_id.city"/><br/>
+                                <span t-if="o.partner_id.commercial_partner_id.country_id" t-out="o.partner_id.commercial_partner_id.country_id.name"/>
                             </div>
+                            <div t-if="o.partner_id.commercial_partner_id.phone" t-out="o.partner_id.commercial_partner_id.phone"/>
                             <div t-if="addressee.vat" style="margin-top: 8px;">
                                 N° intracommunautaire : <span t-out="addressee.vat"/>
                             </div>
@@ -86,6 +89,10 @@
                             </table>
 
                             <div class="bl-box" style="border-top: none;">
+                                <div t-if="o.origin">
+                                    <strong>Document d'origine : </strong>
+                                    <span t-field="o.origin"/>
+                                </div>
                                 <div>Référence : <span t-if="doc.sale_id.client_order_ref" t-out="doc.sale_id.client_order_ref"/></div>
                                 <div>Devise : <span t-out="currency.name"/></div>
                             </div>
@@ -126,10 +133,10 @@
                     <tbody>
                         <tr t-foreach="lines" t-as="line">
                             <td>
-                                <div t-out="line.move_id.description_picking or line.product_id.display_name"/>
                                 <div t-if="line.lot_id or line.lot_name">
                                     lot <span t-out="line.lot_id.name or line.lot_name"/>
                                 </div>
+                                <div t-out="line.move_id.description_picking or line.product_id.display_name"/>
                             </td>
                             <td class="text-end" t-out="'%.2f' % line.quantity"/>
                             <td class="text-center" t-out="line.product_uom_id.name"/>
@@ -138,6 +145,11 @@
                         </tr>
                     </tbody>
                 </table>
+
+                <div t-if="o.x_studio_description">
+                    <strong>Description : </strong>
+                    <span t-field="o.x_studio_description" t-options="{'widget': 'text'}"/>
+                </div>
 
                 <div class="footer">
                     <!-- Total footer-->

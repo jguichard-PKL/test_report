@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Champ de classification de sortie sur la fiche article -->
+    <record id="product_template_form_view_pkl_output_type" model="ir.ui.view">
+        <field name="name">product.template.form.pkl.output.type</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <field name="categ_id" position="after">
+                <field name="pkl_output_type"/>
+            </field>
+        </field>
+    </record>
+
+</odoo>

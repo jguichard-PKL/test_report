@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Vue PIVOT : mesures = quantités (additionnables) -->
+    <record id="pkl_mrp_yield_report_pivot" model="ir.ui.view">
+        <field name="name">pkl.mrp.yield.report.pivot</field>
+        <field name="model">pkl.mrp.yield.report</field>
+        <field name="arch" type="xml">
+            <pivot string="Rendement de fabrication" sample="1">
+                <field name="project_id" type="row"/>
+                <field name="product_id" type="row"/>
+                <field name="date" interval="month" type="col"/>
+                <!-- Vue "valeur" : quantités additionnables -->
+                <field name="qty_good" type="measure"/>
+                <field name="qty_fail" type="measure"/>
+                <field name="qty_retest" type="measure"/>
+                <field name="qty_output" type="measure"/>
+                <!-- Vue "%" : taux (ratio de sommes corrigé via _read_group).
+                     Activables/désactivables dans le menu Mesures. -->
+                <field name="fpy" type="measure"/>
+                <field name="fail_rate" type="measure"/>
+                <field name="retest_rate" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- Vue GRAPH -->
+    <record id="pkl_mrp_yield_report_graph" model="ir.ui.view">
+        <field name="name">pkl.mrp.yield.report.graph</field>
+        <field name="model">pkl.mrp.yield.report</field>
+        <field name="arch" type="xml">
+            <graph string="Rendement de fabrication" type="bar" sample="1">
+                <field name="product_id"/>
+                <field name="qty_good" type="measure"/>
+                <field name="qty_fail" type="measure"/>
+                <field name="qty_retest" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- Vue liste de contrôle (lecture seule) -->
+    <record id="pkl_mrp_yield_report_list" model="ir.ui.view">
+        <field name="name">pkl.mrp.yield.report.list</field>
+        <field name="model">pkl.mrp.yield.report</field>
+        <field name="arch" type="xml">
+            <list string="Rendement de fabrication" create="0" edit="0">
+                <field name="production_id"/>
+                <field name="project_id"/>
+                <field name="product_id"/>
+                <field name="date"/>
+                <field name="qty_good" sum="Total conforme"/>
+                <field name="qty_fail" sum="Total fail"/>
+                <field name="qty_retest" sum="Total retest"/>
+                <field name="qty_output" sum="Total testé"/>
+                <!-- Taux déjà exprimés en % (0–100), pas de widget percentage -->
+                <field name="fpy"/>
+                <field name="fail_rate" optional="hide"/>
+                <field name="retest_rate" optional="hide"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Vue recherche / regroupements par défaut -->
+    <record id="pkl_mrp_yield_report_search" model="ir.ui.view">
+        <field name="name">pkl.mrp.yield.report.search</field>
+        <field name="model">pkl.mrp.yield.report</field>
+        <field name="arch" type="xml">
+            <search string="Rendement de fabrication">
+                <field name="production_id"/>
+                <field name="project_id"/>
+                <field name="product_id"/>
+                <filter name="pkl_done" string="Terminés"
+                        domain="[('state', '=', 'done')]"/>
+                <separator/>
+                <filter name="pkl_group_project" string="Projet"
+                        context="{'group_by': 'project_id'}"/>
+                <filter name="pkl_group_product" string="Étape (produit)"
+                        context="{'group_by': 'product_id'}"/>
+                <filter name="pkl_group_state" string="État"
+                        context="{'group_by': 'state'}"/>
+                <filter name="pkl_group_date" string="Mois"
+                        context="{'group_by': 'date:month'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action : axes par défaut projet × étape × période -->
+    <record id="pkl_mrp_yield_report_action" model="ir.actions.act_window">
+        <field name="name">Rendement de fabrication</field>
+        <field name="res_model">pkl.mrp.yield.report</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="search_view_id" ref="pkl_mrp_yield_report_search"/>
+        <field name="context">{
+            'search_default_pkl_group_project': 1,
+            'search_default_pkl_group_product': 1,
+            'pivot_measures': ['qty_good', 'qty_fail', 'qty_retest', 'qty_output'],
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Aucune donnée de rendement.</p>
+            <p>Le rendement agrégé correct se lit : Σ conforme / Σ testé.
+               Un pourcentage de rendement ne s'additionne pas.</p>
+        </field>
+    </record>
+
+    <!-- Menu sous Fabrication > Rapports -->
+    <menuitem id="pkl_mrp_yield_report_menu"
+              name="Rendement de fabrication"
+              parent="mrp.menu_mrp_reporting"
+              action="pkl_mrp_yield_report_action"
+              sequence="50"/>
+
+</odoo>

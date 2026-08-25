@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Inventaire (stock disponible) : colonne Projet.
+         [À vérifier v19] id de vue : stock.view_stock_quant_tree -->
+    <record id="view_stock_quant_tree_project" model="ir.ui.view">
+        <field name="name">stock.quant.list.project</field>
+        <field name="model">stock.quant</field>
+        <field name="inherit_id" ref="stock.view_stock_quant_tree"/>
+        <field name="arch" type="xml">
+            <field name="lot_id" position="after">
+                <field name="project_id" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Recherche inventaire : filtre + regroupement par projet.
+         [À vérifier v19] id de vue : stock.quant_search_view -->
+    <record id="quant_search_view_project" model="ir.ui.view">
+        <field name="name">stock.quant.search.project</field>
+        <field name="model">stock.quant</field>
+        <field name="inherit_id" ref="stock.quant_search_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <field name="project_id"/>
+                <separator/>
+                <filter name="group_project" string="Projet"
+                        context="{'group_by': 'project_id'}"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

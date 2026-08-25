@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Onglet "Rendement" sur le formulaire de l'OF -->
+    <record id="mrp_production_form_view_pkl_yield" model="ir.ui.view">
+        <field name="name">mrp.production.form.pkl.yield</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
+        <field name="arch" type="xml">
+            <notebook position="inside">
+                <page name="pkl_yield" string="Rendement">
+                    <group>
+                        <group string="Quantités de sortie">
+                            <field name="pkl_qty_good"/>
+                            <field name="pkl_qty_fail"/>
+                            <field name="pkl_qty_retest"/>
+                            <field name="pkl_qty_output"/>
+                        </group>
+                        <group string="Indicateurs (first-pass)">
+                            <field name="pkl_fpy" widget="percentage"/>
+                            <field name="pkl_fail_rate" widget="percentage"/>
+                            <field name="pkl_retest_rate" widget="percentage"/>
+                        </group>
+                    </group>
+                    <div class="text-muted">
+                        Indicateurs calculés sur les quantités produites (mouvements terminés).
+                        Le rendement après retest est un indicateur inter-OF, non calculé ici.
+                    </div>
+                </page>
+            </notebook>
+        </field>
+    </record>
+
+    <!-- Colonnes optionnelles dans la vue liste -->
+    <record id="mrp_production_tree_view_pkl_yield" model="ir.ui.view">
+        <field name="name">mrp.production.list.pkl.yield</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.mrp_production_tree_view"/>
+        <field name="arch" type="xml">
+            <field name="state" position="before">
+                <field name="pkl_fpy" widget="percentage" optional="show"/>
+                <field name="pkl_qty_fail" optional="hide"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Filtres et regroupements -->
+    <record id="view_mrp_production_filter_pkl_yield" model="ir.ui.view">
+        <field name="name">mrp.production.search.pkl.yield</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.view_mrp_production_filter"/>
+        <field name="arch" type="xml">
+            <!-- On ancre sur <search> directement : les filtres "domain"
+                 apparaissent dans le menu Filtres et les filtres "group_by"
+                 sont automatiquement regroupés sous "Regrouper par" par le
+                 client web, quel que soit leur emplacement. -->
+            <xpath expr="//search" position="inside">
+                <separator/>
+                <filter name="pkl_with_fail" string="Avec fail"
+                        domain="[('pkl_qty_fail', '>', 0)]"/>
+                <filter name="pkl_with_retest" string="Avec retest"
+                        domain="[('pkl_qty_retest', '>', 0)]"/>
+                <separator/>
+                <!-- Regroupements : projet, étape (produit), origine.
+                     L'origine permet d'agréger les OF splittés / backorders
+                     (OF-1/-2/-3) qui partagent la même source. -->
+                <filter name="pkl_group_project" string="Projet"
+                        context="{'group_by': 'project_id'}"/>
+                <filter name="pkl_group_product" string="Étape (produit)"
+                        context="{'group_by': 'product_id'}"/>
+                <filter name="pkl_group_origin" string="Origine"
+                        context="{'group_by': 'origin'}"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

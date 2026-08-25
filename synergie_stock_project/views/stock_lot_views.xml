@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Formulaire lot : champ Projet (éditable pour correction manuelle).
+         [À vérifier v19] id de vue : stock.view_production_lot_form -->
+    <record id="view_production_lot_form_project" model="ir.ui.view">
+        <field name="name">stock.lot.form.project</field>
+        <field name="model">stock.lot</field>
+        <field name="inherit_id" ref="stock.view_production_lot_form"/>
+        <field name="arch" type="xml">
+            <field name="product_id" position="after">
+                <field name="project_id"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Liste lot : colonne Projet optionnelle.
+         [À vérifier v19] id de vue : stock.view_production_lot_tree -->
+    <record id="view_production_lot_tree_project" model="ir.ui.view">
+        <field name="name">stock.lot.list.project</field>
+        <field name="model">stock.lot</field>
+        <field name="inherit_id" ref="stock.view_production_lot_tree"/>
+        <field name="arch" type="xml">
+            <field name="product_id" position="after">
+                <field name="project_id" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Recherche lot : filtre cherchable + regroupement par projet.
+         [À vérifier v19] id de vue : stock.search_product_lot_filter -->
+    <record id="search_product_lot_filter_project" model="ir.ui.view">
+        <field name="name">stock.lot.search.project</field>
+        <field name="model">stock.lot</field>
+        <field name="inherit_id" ref="stock.search_product_lot_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <field name="project_id"/>
+                <separator/>
+                <filter name="group_project" string="Projet"
+                        context="{'group_by': 'project_id'}"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
