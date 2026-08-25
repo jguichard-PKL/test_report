@@ -14,6 +14,12 @@
          Sans projet sur le mouvement : aucune restriction (comportement
          standard conservé), cohérent avec le reste du module.
 
+         ⚠️ 'parent.project_id' ne se résout que si project_id est un champ
+         RÉELLEMENT CHARGÉ sur le formulaire parent (stock.view_stock_move_
+         operations, "Move Detail" — cf. stock_move_views.xml). Sans ce champ
+         déclaré là-bas (même invisible), le domaine ne filtrait jamais,
+         silencieusement (parent.project_id toujours résolu comme absent).
+
          [À vérifier v19] id de vue : stock.view_stock_move_line_operation_tree.
          'parent' résout ici vers stock.move : ce champ est utilisé via
          move_line_ids, embarqué dans stock.view_move_form (cf. contexte
@@ -33,8 +39,15 @@
          standalone par le bouton "Moves" du transfert
          (stock.picking.action_detailed_operations()). Pas de 'parent' ici :
          cette vue est ouverte directement sur stock.move.line, pas imbriquée
-         dans un formulaire parent. On retraverse donc via move_id, déjà
-         chargé en colonne invisible sur cette même vue.
+         dans un formulaire parent.
+
+         ⚠️ Une chaîne relationnelle à deux niveaux (move_id.project_id) dans
+         un domaine de vue n'est PAS résolue côté client (seul move_id.id est
+         chargé par défaut) : le domaine ne filtrait jamais. Le cœur
+         contourne déjà exactement ce problème pour picking_location_id
+         (champ related "à plat" sur stock.move.line, pas picking_id.location_id
+         inline) — on applique le même contournement avec le champ relais
+         project_id ajouté dans stock_move_line.py (related=move_id.project_id).
 
          [À vérifier v19] id de vue : stock.view_stock_move_line_detailed_operation_tree. -->
     <record id="view_stock_move_line_detailed_operation_tree_project" model="ir.ui.view">
@@ -42,8 +55,11 @@
         <field name="model">stock.move.line</field>
         <field name="inherit_id" ref="stock.view_stock_move_line_detailed_operation_tree"/>
         <field name="arch" type="xml">
+            <field name="move_id" position="after">
+                <field name="project_id" column_invisible="True"/>
+            </field>
             <field name="quant_id" position="attributes">
-                <attribute name="domain">[('product_id', '=', product_id), ('location_id', 'child_of', picking_location_id)] + ([('lot_id.project_id', '=', move_id.project_id)] if move_id.project_id else [])</attribute>
+                <attribute name="domain">[('product_id', '=', product_id), ('location_id', 'child_of', picking_location_id)] + ([('lot_id.project_id', '=', project_id)] if project_id else [])</attribute>
             </field>
         </field>
     </record>

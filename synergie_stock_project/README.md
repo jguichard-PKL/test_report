@@ -155,6 +155,28 @@ mouvement>` quand le mouvement (ou la ligne, selon la vue) porte un projet.
 Sans projet sur le mouvement, aucune restriction (comportement standard
 conservé).
 
+⚠️ **Piège rencontré en test, corrigé** : un domaine de vue ne peut résoudre
+qu'un champ **réellement chargé** sur l'enregistrement courant ou sur le
+parent immédiat (un seul niveau) — jamais un champ non déclaré dans la vue,
+ni une chaîne relationnelle à deux niveaux (`move_id.project_id`). Deux
+correctifs supplémentaires ont été nécessaires pour que le filtre se
+déclenche réellement (sans eux, `parent.project_id` / `move_id.project_id`
+étaient toujours résolus comme absents, et le domaine ajouté ne filtrait
+jamais, silencieusement) :
+
+1. `project_id` n'était pas chargé sur le formulaire popup "Move Detail"
+   (`stock.view_stock_move_operations`, ouvert via l'icône "Show details"
+   sur une ligne de l'onglet Opérations) qui embarque
+   `view_stock_move_line_operation_tree` — `parent.project_id` n'y était donc
+   jamais résolu. Corrigé en ajoutant `project_id` (invisible) à ce
+   formulaire ([stock_move_views.xml](views/stock_move_views.xml)).
+2. `move_id.project_id` (deux niveaux) n'est pas résolu comme valeur de
+   domaine côté client. Corrigé en ajoutant un champ related **à plat** sur
+   `stock.move.line` ([stock_move_line.py](models/stock_move_line.py),
+   `project_id = fields.Many2one(related='move_id.project_id')`), exactement
+   le contournement déjà utilisé par le cœur pour `picking_location_id`
+   (`related='picking_id.location_id'`, cf. `stock/models/stock_move_line.py`).
+
 **Reste hors périmètre** : la saisie manuelle d'un **numéro de lot en texte
 libre** (champ `lot_name`, utilisé en réception quand le lot n'existe pas
 encore) n'est par nature liée à aucun quant existant — rien à filtrer.
