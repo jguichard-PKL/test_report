@@ -92,7 +92,41 @@ Aucune dépendance `purchase_stock` requise : marche aussi pour les réceptions
 Le hook reste **surchargeable** : brancher une autre source (commande d'achat…)
 se fait en redéfinissant `_get_reception_project()`, sans toucher au compute.
 
-## 5. Périmètre couvert / non couvert
+## 5. Réservation restreinte au projet
+
+Au-delà du tamponnage (§2-4), la **réservation automatique** de stock
+(`_action_assign`, déclenchée à la confirmation d'un mouvement ou via
+« Vérifier la disponibilité ») est elle aussi contrainte par projet : un
+mouvement portant un `project_id` ne peut réserver que des lots du **même**
+projet.
+
+Mécanique (suit l'idiome déjà utilisé par le cœur pour `with_expiration`) :
+
+1. `stock.move._update_reserved_quantity()` — le point appelé par
+   `_action_assign()` pour réserver un mouvement MTS (sans `move_orig_ids`) —
+   pose un contexte `restrict_project_id` égal au `project_id` du mouvement
+   avant de déléguer au cœur. Sans projet sur le mouvement, comportement
+   Odoo standard, aucun filtre.
+2. `stock.quant._get_gather_domain()` — LE point où le cœur construit le
+   domaine de recherche des quants candidats (dont `_gather`,
+   `_get_available_quantity`, `_get_reserve_quantity` découlent tous) — lit ce
+   contexte et ajoute `lot_id.project_id = restrict_project_id` au domaine.
+
+Si aucun quant ne correspond au projet, la réservation prend 0, comme un
+stockout standard Odoo (le mouvement reste `confirmed`/`waiting` ou passe
+`partially_available`) : **pas d'erreur, jamais de réservation d'un lot hors
+projet**.
+
+**Hors périmètre** : le chemin MTO (mouvement chaîné, `move_orig_ids`
+renseigné) réutilise les lots déjà réservés par le mouvement amont sans
+nouvelle recherche de quants — aucun trou tant que ce mouvement amont porte
+lui-même le bon projet (cas normal, le projet est porté de bout en bout par
+la chaîne). La sélection **manuelle** d'un lot sur une ligne de mouvement
+(saisie directe dans `move_line_ids.lot_id`) n'est pas bridée par un domaine
+de vue : la restriction porte sur la réservation **automatique**, pas sur la
+correction manuelle.
+
+## 6. Périmètre couvert / non couvert
 
 | Flux | Couvert ? | Détail |
 |------|-----------|--------|
@@ -102,9 +136,12 @@ se fait en redéfinissant `_get_reception_project()`, sans toucher au compute.
 | Lot déjà rattaché à un projet | ✅ | **jamais écrasé** |
 | Filtre / group_by par projet | ✅ | lots, mouvements, transferts, **stock disponible** |
 | Réception (entrée de stock) | ✅ | projet saisi sur le transfert (`stock.picking`) → mouvement → lot |
+| Réservation automatique par projet | ✅ | `_action_assign` (MTS) ne réserve que des lots du même projet |
+| Réservation MTO (mouvement chaîné) | ➖ hors périmètre | hérite du filtrage du mouvement amont, pas de re-filtrage |
+| Sélection manuelle d'un lot | ➖ hors périmètre | pas de domaine de vue, correction libre assumée |
 | Composants consommés | ➖ hors périmètre | volontairement non traités |
 
-## 6. Lien avec `synergie_mrp_performance`
+## 7. Lien avec `synergie_mrp_performance`
 
 `synergie_mrp_performance` fournit le **rendement (FPY)** par OF et un reporting
 agrégé ; il s'appuie sur `mrp.production.project_id` pour grouper par projet.
@@ -131,6 +168,8 @@ Plusieurs points d'API sont marqués `# [À vérifier v19]` dans le code :
 - signature et valeur de retour de `stock.move._action_done()` ;
 - présence de `production_id` vs `raw_material_production_id` sur `stock.move` ;
 - valeur `picking_type_id.code == 'incoming'` pour détecter une réception ;
+- existence et signature de `stock.quant._get_gather_domain()` et de
+  `stock.move._update_reserved_quantity()` (mécanique de réservation, §5) ;
 - identifiants externes des vues héritées (`stock.view_production_lot_form`,
   `stock.view_picking_form`, `stock.view_picking_internal_search`, etc.) et
   l'ancre `origin` sur le formulaire de transfert.
