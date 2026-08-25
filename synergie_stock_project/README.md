@@ -240,22 +240,35 @@ attribut `domain` XML posé côté serveur. Le domaine du champ `quant_id` (§5.
 ne s'y applique donc **pas** : confirmé en test réel, un lot d'un autre projet
 restait sélectionnable via ce bouton et créait bien une ligne de mouvement.
 
-Corrigé par un **patch JS** ([static/src/js/sml_x2_many_patch.js](static/src/js/sml_x2_many_patch.js)),
+**[TEMPORAIRE, décision Synergie] Blocage retiré, remplacé par un
+regroupement par défaut.** Plutôt qu'un blocage dur, ce chemin applique
+désormais un `group_by: 'project_id'` par défaut sur la liste de quants
+proposée — l'utilisateur voit ses lots organisés par projet (comme sur la
+capture « Add line », groupes HiCore1 / None / ...), mais reste libre d'en
+sélectionner un hors projet s'il le souhaite. Implémenté dans le même fichier
+([static/src/js/sml_x2_many_patch.js](static/src/js/sml_x2_many_patch.js)),
 enregistré comme asset `web.assets_backend`
 ([__manifest__.py](__manifest__.py)) : surcharge de `onAdd()` via
 `patch(SMLX2ManyField.prototype, {...})` (même mécanisme que celui utilisé
 par le module cœur `mrp_subcontracting` pour patcher ce même composant),
-ajoutant `["lot_id.project_id", "=", <projet du mouvement>]` au domaine
-construit par le cœur. Sans projet sur le mouvement, aucune restriction.
+ajoutant `group_by: 'project_id'` au contexte transmis au sélecteur.
+
+⚠️ Le contexte de champ XML (`this.props.context`, où l'on aurait pu poser un
+`search_default_...`) **n'est pas fusionné** dans ce chemin précis de
+`onAdd()` — contrairement à `X2ManyField.onAdd()` de base — d'où l'obligation
+de rester en JS malgré le retrait du blocage : impossible d'obtenir ce
+regroupement par un simple attribut `context` XML sur `move_line_ids`.
 
 ⚠️ **Duplication assumée** : il n'existe aucun point d'extension isolant la
-construction du domaine dans `onAdd()` (contrairement à
+construction du contexte/domaine dans `onAdd()` (contrairement à
 `quantListViewShowOnHandOnly`, un simple getter que `mrp_subcontracting`
-surcharge proprement) — le patch **reproduit l'intégralité de la méthode**
-avec une ligne ajoutée. Fragile aux futures évolutions du cœur : si `onAdd()`
-change de signature ou de logique en v19.x, ce patch doit être resynchronisé
-manuellement (pas d'erreur explicite en cas de désynchronisation, juste un
-retour au comportement non filtré).
+surcharge proprement) — le patch **reproduit l'intégralité de la méthode**.
+Fragile aux futures évolutions du cœur : si `onAdd()` change de signature ou
+de logique en v19.x, ce patch doit être resynchronisé manuellement.
+
+**Pour revenir au blocage dur** : réintroduire dans le domaine
+`["lot_id.project_id", "=", projectId]` quand `project_id` est renseigné sur
+le mouvement (cf. historique git de ce fichier).
 
 **Reste hors périmètre** : la saisie manuelle d'un **numéro de lot en texte
 libre** (champ `lot_name`, utilisé en réception quand le lot n'existe pas
@@ -274,7 +287,7 @@ encore) n'est par nature liée à aucun quant existant — rien à filtrer.
 | Réservation automatique par projet (MTS) | ✅ | `_action_assign` (sans `move_orig_ids`) ne réserve que des lots du même projet |
 | Réservation MTO (mouvement chaîné, dont sous-traitance) | ✅ | `_get_available_move_lines()` filtre tout mouvement projeté (§5.1) |
 | Sélection manuelle d'un quant (widget « Pick From », domaine XML) | ✅ | domaine du champ `quant_id` complété par projet (§5.2) |
-| Sélection manuelle via « Add a line » (widget JS `sml_x2_many`) | ✅ | patch JS de `onAdd()`, domaine construit côté client (§5.3) |
+| Sélection manuelle via « Add a line » (widget JS `sml_x2_many`) | ➖ non bloqué (temporaire) | regroupement par projet par défaut au lieu d'un blocage — décision Synergie (§5.3) |
 | Saisie d'un lot en texte libre (`lot_name`) | ➖ hors périmètre | pas de quant existant à filtrer (création de lot en réception) |
 | Composants consommés — réservation restreinte par projet | ✅ | `raw_material_production_id.project_id`, MTS **et** MTO (§5, §5.1) |
 | Composants consommés — propagation au lot | ➖ hors périmètre (volontaire) | jamais tamponnés (`_action_done` les exclut explicitement) |

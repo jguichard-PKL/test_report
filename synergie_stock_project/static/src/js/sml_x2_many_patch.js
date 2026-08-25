@@ -6,23 +6,30 @@ import { Domain } from "@web/core/domain";
 import { SMLX2ManyField } from "@stock/fields/stock_move_line_x2_many_field";
 
 /**
- * Restreint au projet du mouvement le sélecteur de quant du widget
- * "Detailed Operations" (champ move_line_ids, widget sml_x2_many, popup
- * "Move Detail" — stock.view_stock_move_operations).
+ * [TEMPORAIRE] Blocage par projet retiré (cf. décision Synergie) : le
+ * sélecteur de quant du widget "Detailed Operations" (champ move_line_ids,
+ * widget sml_x2_many, popup "Move Detail" — stock.view_stock_move_operations)
+ * n'est PLUS restreint par projet ici. Remplacé par un regroupement par
+ * projet actif par défaut, pour guider visuellement l'utilisateur sans
+ * bloquer la sélection (cf. README §5.3).
  *
- * Ce widget est un composant OWL qui construit son domaine de recherche de
- * quants EN JAVASCRIPT, dans onAdd() (cf. stock/static/src/fields/
- * stock_move_line_x2_many_field.js) : ["product_id", ...], ["location_id",
- * "child_of", ...], ["quantity", ">", 0.0]. Aucun attribut `domain` XML n'y
- * est lu — le domaine posé sur le champ quant_id côté serveur
- * (stock_move_line_views.xml) ne s'applique donc PAS à ce chemin, qui reste
- * un trou distinct malgré ce correctif-là (confirmé en test : sélection
- * manuelle d'un lot hors projet toujours possible via "Add a line").
+ * Rappel du contexte : ce widget construit son domaine/contexte de recherche
+ * de quants EN JAVASCRIPT, dans onAdd() (cf. stock/static/src/fields/
+ * stock_move_line_x2_many_field.js). Le contexte de champ XML
+ * (this.props.context) n'y est PAS fusionné dans ce chemin précis
+ * (contrairement à X2ManyField.onAdd() de base) : impossible de forcer le
+ * regroupement uniquement via un attribut `context` XML sur move_line_ids,
+ * d'où ce patch JS malgré tout.
  *
  * [À vérifier v19] Ce patch DUPLIQUE la logique de onAdd() (pas de point
- * d'extension isolant la construction du domaine) pour n'y ajouter qu'une
- * ligne. Fragile aux futures évolutions du cœur : si onAdd() change de
- * signature/logique côté Odoo, ce patch doit être resynchronisé à la main.
+ * d'extension isolant la construction du domaine/contexte) pour n'y changer
+ * que le contexte transmis à selectCreate(). Fragile aux futures évolutions
+ * du cœur : si onAdd() change de signature/logique côté Odoo, ce patch doit
+ * être resynchronisé à la main.
+ *
+ * Pour rétablir le blocage dur précédent : réintroduire dans le domaine
+ * `["lot_id.project_id", "=", projectId]` quand
+ * `this.props.record.data.project_id` est renseigné (cf. historique git).
  */
 patch(SMLX2ManyField.prototype, {
     async onAdd({ context, editable } = {}) {
@@ -36,6 +43,9 @@ patch(SMLX2ManyField.prototype, {
             ...context,
             single_product: true,
             list_view_ref: "stock.view_stock_quant_tree_simple",
+            // --- Ajout Synergie : regroupement par projet actif par défaut ---
+            group_by: "project_id",
+            // --- Fin ajout ---
         };
         const productName = this.props.record.data.product_id.display_name;
         const title = _t("Add line: %s", productName);
@@ -47,12 +57,6 @@ patch(SMLX2ManyField.prototype, {
         if (this.quantListViewShowOnHandOnly) {
             domain.push(["on_hand", "=", true]);
         }
-        // --- Ajout Synergie : restriction par projet du mouvement ---
-        const projectId = this.props.record.data.project_id && this.props.record.data.project_id.id;
-        if (projectId) {
-            domain.push(["lot_id.project_id", "=", projectId]);
-        }
-        // --- Fin ajout ---
         if (this.dirtyQuantsData.size) {
             const notFullyUsed = [];
             const fullyUsed = [];
