@@ -128,3 +128,37 @@ class StockMove(models.Model):
             )
             quants.modified(["lot_id"])
         return moves_done
+
+    def _update_reserved_quantity(self, need, location_id, lot_id=None, package_id=None, owner_id=None, strict=True):
+        """Restreint la réservation automatique aux lots du projet du mouvement.
+
+        Point d'accroche : cette méthode est celle appelée par _action_assign()
+        pour réserver un mouvement MTS (sans move_orig_ids) — cf. stock/models/
+        stock_move.py, appel `move._update_reserved_quantity(need, move.location_id,
+        strict=False)`. Elle délègue ensuite au cœur, qui recherche les quants via
+        stock.quant._get_gather_domain() (cf. stock_quant.py). On y ajoute le
+        filtre projet en posant un contexte 'restrict_project_id', plutôt qu'en
+        réécrivant la mécanique de réservation.
+
+        Sans projet sur le mouvement (project_id vide) : comportement standard
+        Odoo inchangé, aucun filtre.
+
+        [À vérifier v19] Ne couvre pas le chemin MTO (mouvement avec
+        move_orig_ids, cf. _action_assign, branche `_update_reserved_quantity_vals`
+        appelée directement) : ce chemin réutilise les lots déjà réservés par le
+        mouvement amont, sans nouvelle recherche de quants. Aucun trou de filtrage
+        tant que ce mouvement amont porte lui-même le bon project_id (cas normal :
+        le projet est porté de bout en bout par la chaîne de transferts/OF).
+
+        Si aucun quant ne correspond au projet, la réservation prend 0 (comme un
+        stockout standard Odoo) : le mouvement reste 'confirmed'/'waiting' ou passe
+        'partially_available', sans erreur ni réservation d'un lot hors projet.
+        """
+        self.ensure_one()
+        if not self.project_id:
+            return super()._update_reserved_quantity(
+                need, location_id, lot_id=lot_id, package_id=package_id, owner_id=owner_id, strict=strict
+            )
+        return super(StockMove, self.with_context(restrict_project_id=self.project_id.id))._update_reserved_quantity(
+            need, location_id, lot_id=lot_id, package_id=package_id, owner_id=owner_id, strict=strict
+        )
