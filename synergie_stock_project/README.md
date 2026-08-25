@@ -134,6 +134,22 @@ stockout standard Odoo (le mouvement reste `confirmed`/`waiting` ou passe
 `partially_available`) : **pas d'erreur, jamais de réservation d'un lot hors
 projet**.
 
+⚠️ **Pour tester : ne pas se fier au champ « Product Availability » du
+transfert.** Ce texte (`stock.picking.products_availability`, "Available" /
+"Not Available" / "Exp <date>") est un indicateur **prévisionnel** cœur Odoo,
+calculé depuis `move.forecast_availability` → `product.free_qty` /
+`virtual_available` — une quantité agrégée **par produit et par entrepôt,
+tous lots et tous projets confondus**. Il ne passe jamais par
+`_get_gather_domain()` et affichera "Available" dès qu'il existe du stock de
+l'article quelque part, **même sans aucun lot du bon projet**.
+
+L'indicateur fiable est la **barre de statut du transfert**
+(Draft › Waiting › Ready › Done) et/ou `move_line_ids` : si la réservation a
+réellement échoué faute de lot au bon projet, le transfert reste bloqué en
+« Waiting » (jamais « Ready ») et la liste des mouvements (`move_line_ids`,
+bouton « Moves ») reste vide — quel que soit ce que dit "Product
+Availability".
+
 ### 5.1 Chemin MTO (mouvement chaîné) : couvert pour tout mouvement projeté
 
 `_update_reserved_quantity()` (§5) n'est appelée par `_action_assign()` que
@@ -211,6 +227,36 @@ jamais, silencieusement) :
    le contournement déjà utilisé par le cœur pour `picking_location_id`
    (`related='picking_id.location_id'`, cf. `stock/models/stock_move_line.py`).
 
+### 5.3 « Add a line » sur le popup "Move Detail" (widget JS `sml_x2_many`)
+
+⚠️ **Troisième trou, distinct des deux précédents** : le popup "Move Detail"
+(§5.2) affiche `move_line_ids` avec `widget="sml_x2_many"`
+(`stock.view_stock_move_operations`), pas un simple champ x2many standard.
+Ce widget est un composant **OWL côté client**
+(`SMLX2ManyField`, `stock/static/src/fields/stock_move_line_x2_many_field.js`)
+qui, sur clic « Add a line », construit **son propre domaine de recherche de
+quants en JavaScript** dans sa méthode `onAdd()` — indépendamment de tout
+attribut `domain` XML posé côté serveur. Le domaine du champ `quant_id` (§5.2)
+ne s'y applique donc **pas** : confirmé en test réel, un lot d'un autre projet
+restait sélectionnable via ce bouton et créait bien une ligne de mouvement.
+
+Corrigé par un **patch JS** ([static/src/js/sml_x2_many_patch.js](static/src/js/sml_x2_many_patch.js)),
+enregistré comme asset `web.assets_backend`
+([__manifest__.py](__manifest__.py)) : surcharge de `onAdd()` via
+`patch(SMLX2ManyField.prototype, {...})` (même mécanisme que celui utilisé
+par le module cœur `mrp_subcontracting` pour patcher ce même composant),
+ajoutant `["lot_id.project_id", "=", <projet du mouvement>]` au domaine
+construit par le cœur. Sans projet sur le mouvement, aucune restriction.
+
+⚠️ **Duplication assumée** : il n'existe aucun point d'extension isolant la
+construction du domaine dans `onAdd()` (contrairement à
+`quantListViewShowOnHandOnly`, un simple getter que `mrp_subcontracting`
+surcharge proprement) — le patch **reproduit l'intégralité de la méthode**
+avec une ligne ajoutée. Fragile aux futures évolutions du cœur : si `onAdd()`
+change de signature ou de logique en v19.x, ce patch doit être resynchronisé
+manuellement (pas d'erreur explicite en cas de désynchronisation, juste un
+retour au comportement non filtré).
+
 **Reste hors périmètre** : la saisie manuelle d'un **numéro de lot en texte
 libre** (champ `lot_name`, utilisé en réception quand le lot n'existe pas
 encore) n'est par nature liée à aucun quant existant — rien à filtrer.
@@ -227,7 +273,8 @@ encore) n'est par nature liée à aucun quant existant — rien à filtrer.
 | Réception / livraison / transfert interne | ✅ | projet saisi sur le transfert (`stock.picking`, tout type) → mouvement → lot |
 | Réservation automatique par projet (MTS) | ✅ | `_action_assign` (sans `move_orig_ids`) ne réserve que des lots du même projet |
 | Réservation MTO (mouvement chaîné, dont sous-traitance) | ✅ | `_get_available_move_lines()` filtre tout mouvement projeté (§5.1) |
-| Sélection manuelle d'un quant (widget « Pick From ») | ✅ | domaine du champ `quant_id` complété par projet (§5.2) |
+| Sélection manuelle d'un quant (widget « Pick From », domaine XML) | ✅ | domaine du champ `quant_id` complété par projet (§5.2) |
+| Sélection manuelle via « Add a line » (widget JS `sml_x2_many`) | ✅ | patch JS de `onAdd()`, domaine construit côté client (§5.3) |
 | Saisie d'un lot en texte libre (`lot_name`) | ➖ hors périmètre | pas de quant existant à filtrer (création de lot en réception) |
 | Composants consommés — réservation restreinte par projet | ✅ | `raw_material_production_id.project_id`, MTS **et** MTO (§5, §5.1) |
 | Composants consommés — propagation au lot | ➖ hors périmètre (volontaire) | jamais tamponnés (`_action_done` les exclut explicitement) |
@@ -269,6 +316,11 @@ Plusieurs points d'API sont marqués `# [À vérifier v19]` dans le code :
   `stock.view_stock_move_line_detailed_operation_tree`, présence du champ
   `quant_id` (widget `pick_from`) et de ses variables de domaine
   (`parent.location_id`, `picking_location_id`) — cf. §5.2 ;
+- **JS** : implémentation complète de `SMLX2ManyField.onAdd()`
+  (`stock/static/src/fields/stock_move_line_x2_many_field.js`), dupliquée par
+  [static/src/js/sml_x2_many_patch.js](static/src/js/sml_x2_many_patch.js) —
+  cf. §5.3. Le point le plus exposé à une casse silencieuse en cas de montée
+  de version : à revérifier à chaque upgrade Odoo, pas seulement en v19 ;
 - identifiants externes des vues héritées (`stock.view_production_lot_form`,
   `stock.view_picking_form`, `stock.view_picking_internal_search`, etc.) et
   l'ancre `origin` sur le formulaire de transfert.
