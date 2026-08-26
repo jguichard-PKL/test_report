@@ -227,7 +227,7 @@ jamais, silencieusement) :
    le contournement déjà utilisé par le cœur pour `picking_location_id`
    (`related='picking_id.location_id'`, cf. `stock/models/stock_move_line.py`).
 
-### 5.3 « Add a line » sur le popup "Move Detail" (widget JS `sml_x2_many`)
+### 5.3 « Add a line » sur le popup "Move Detail" (widget JS `sml_x2_many`) : hors périmètre, décision assumée
 
 ⚠️ **Troisième trou, distinct des deux précédents** : le popup "Move Detail"
 (§5.2) affiche `move_line_ids` avec `widget="sml_x2_many"`
@@ -240,35 +240,26 @@ attribut `domain` XML posé côté serveur. Le domaine du champ `quant_id` (§5.
 ne s'y applique donc **pas** : confirmé en test réel, un lot d'un autre projet
 restait sélectionnable via ce bouton et créait bien une ligne de mouvement.
 
-**[TEMPORAIRE, décision Synergie] Blocage retiré, remplacé par un
-regroupement par défaut.** Plutôt qu'un blocage dur, ce chemin applique
-désormais un `group_by: 'project_id'` par défaut sur la liste de quants
-proposée — l'utilisateur voit ses lots organisés par projet (comme sur la
-capture « Add line », groupes HiCore1 / None / ...), mais reste libre d'en
-sélectionner un hors projet s'il le souhaite. Implémenté dans le même fichier
-([static/src/js/sml_x2_many_patch.js](static/src/js/sml_x2_many_patch.js)),
-enregistré comme asset `web.assets_backend`
-([__manifest__.py](__manifest__.py)) : surcharge de `onAdd()` via
-`patch(SMLX2ManyField.prototype, {...})` (même mécanisme que celui utilisé
-par le module cœur `mrp_subcontracting` pour patcher ce même composant),
-ajoutant `group_by: 'project_id'` au contexte transmis au sélecteur.
+**Aucun correctif module pour ce chemin précis — décision Synergie.** Deux
+approches ont été explorées et écartées :
 
-⚠️ Le contexte de champ XML (`this.props.context`, où l'on aurait pu poser un
-`search_default_...`) **n'est pas fusionné** dans ce chemin précis de
-`onAdd()` — contrairement à `X2ManyField.onAdd()` de base — d'où l'obligation
-de rester en JS malgré le retrait du blocage : impossible d'obtenir ce
-regroupement par un simple attribut `context` XML sur `move_line_ids`.
+1. **Blocage dur en JS** (patch de `onAdd()`, dupliquant l'intégralité de la
+   méthode faute de point d'extension isolant la construction du domaine) —
+   fonctionnel, mais jugé trop fragile à maintenir (resynchronisation
+   manuelle à chaque évolution du cœur, sans erreur explicite en cas d'oubli).
+2. **Regroupement par projet par défaut**, comme alternative plus douce —
+   **techniquement impossible sans un patch d'une portée bien plus large** :
+   la popup passe par `SelectCreateDialog`, un composant **générique**
+   réutilisé dans toute l'interface Odoo pour toute recherche "Sélectionner/
+   Créer" sur un champ Many2one. Celui-ci ne lit jamais `context.group_by`
+   (il attend une prop `groupBy` explicite que `SelectCreateDialog` ne
+   construit jamais depuis le contexte) — le corriger aurait affecté cet
+   écran système bien au-delà du stock.
 
-⚠️ **Duplication assumée** : il n'existe aucun point d'extension isolant la
-construction du contexte/domaine dans `onAdd()` (contrairement à
-`quantListViewShowOnHandOnly`, un simple getter que `mrp_subcontracting`
-surcharge proprement) — le patch **reproduit l'intégralité de la méthode**.
-Fragile aux futures évolutions du cœur : si `onAdd()` change de signature ou
-de logique en v19.x, ce patch doit être resynchronisé manuellement.
-
-**Pour revenir au blocage dur** : réintroduire dans le domaine
-`["lot_id.project_id", "=", projectId]` quand `project_id` est renseigné sur
-le mouvement (cf. historique git de ce fichier).
+**Solution retenue, hors module** : un filtre de recherche sauvegardé
+(favori partagé, appliqué par défaut à tous les utilisateurs) configuré
+directement dans l'interface Odoo, plutôt que du code. À documenter/maintenir
+côté configuration Synergie, pas dans ce module.
 
 **Reste hors périmètre** : la saisie manuelle d'un **numéro de lot en texte
 libre** (champ `lot_name`, utilisé en réception quand le lot n'existe pas
@@ -287,7 +278,7 @@ encore) n'est par nature liée à aucun quant existant — rien à filtrer.
 | Réservation automatique par projet (MTS) | ✅ | `_action_assign` (sans `move_orig_ids`) ne réserve que des lots du même projet |
 | Réservation MTO (mouvement chaîné, dont sous-traitance) | ✅ | `_get_available_move_lines()` filtre tout mouvement projeté (§5.1) |
 | Sélection manuelle d'un quant (widget « Pick From », domaine XML) | ✅ | domaine du champ `quant_id` complété par projet (§5.2) |
-| Sélection manuelle via « Add a line » (widget JS `sml_x2_many`) | ➖ non bloqué (temporaire) | regroupement par projet par défaut au lieu d'un blocage — décision Synergie (§5.3) |
+| Sélection manuelle via « Add a line » (widget JS `sml_x2_many`) | ➖ hors périmètre (décision) | pas de correctif module ; filtre partagé configuré côté Odoo (§5.3) |
 | Saisie d'un lot en texte libre (`lot_name`) | ➖ hors périmètre | pas de quant existant à filtrer (création de lot en réception) |
 | Composants consommés — réservation restreinte par projet | ✅ | `raw_material_production_id.project_id`, MTS **et** MTO (§5, §5.1) |
 | Composants consommés — propagation au lot | ➖ hors périmètre (volontaire) | jamais tamponnés (`_action_done` les exclut explicitement) |
@@ -329,11 +320,6 @@ Plusieurs points d'API sont marqués `# [À vérifier v19]` dans le code :
   `stock.view_stock_move_line_detailed_operation_tree`, présence du champ
   `quant_id` (widget `pick_from`) et de ses variables de domaine
   (`parent.location_id`, `picking_location_id`) — cf. §5.2 ;
-- **JS** : implémentation complète de `SMLX2ManyField.onAdd()`
-  (`stock/static/src/fields/stock_move_line_x2_many_field.js`), dupliquée par
-  [static/src/js/sml_x2_many_patch.js](static/src/js/sml_x2_many_patch.js) —
-  cf. §5.3. Le point le plus exposé à une casse silencieuse en cas de montée
-  de version : à revérifier à chaque upgrade Odoo, pas seulement en v19 ;
 - identifiants externes des vues héritées (`stock.view_production_lot_form`,
   `stock.view_picking_form`, `stock.view_picking_internal_search`, etc.) et
   l'ancre `origin` sur le formulaire de transfert.

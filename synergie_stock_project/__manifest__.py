@@ -37,17 +37,6 @@ source projet sur transfert (_get_picking_project).
         "views/stock_move_line_views.xml",
         "views/stock_quant_views.xml",
     ],
-    # Patch JS de stock.SMLX2ManyField (widget sml_x2_many, popup "Move
-    # Detail") : ce widget construit son contexte/domaine de recherche de
-    # quants en JavaScript (onAdd()), indépendamment de tout attribut XML — le
-    # domaine posé sur le champ quant_id (stock_move_line_views.xml) ne s'y
-    # applique pas. [TEMPORAIRE] Blocage par projet retiré côté Synergie :
-    # regroupement par projet actif par défaut à la place. Cf. README §5.3.
-    "assets": {
-        "web.assets_backend": [
-            "synergie_stock_project/static/src/js/sml_x2_many_patch.js",
-        ],
-    },
     "installable": True,
     "application": False,
 }
