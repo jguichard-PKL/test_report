@@ -14,16 +14,13 @@
          Sans projet sur le mouvement : aucune restriction (comportement
          standard conservé), cohérent avec le reste du module.
 
-         ⚠️ 'parent.project_id' ne se résout que si project_id est un champ
+         'parent.project_id' ne se résout que si project_id est un champ
          RÉELLEMENT CHARGÉ sur le formulaire parent (stock.view_stock_move_
          operations, "Move Detail" — cf. stock_move_views.xml). Sans ce champ
          déclaré là-bas (même invisible), le domaine ne filtrait jamais,
          silencieusement (parent.project_id toujours résolu comme absent).
-
-         [À vérifier v19] id de vue : stock.view_stock_move_line_operation_tree.
-         'parent' résout ici vers stock.move : ce champ est utilisé via
-         move_line_ids, embarqué dans stock.view_move_form (cf. contexte
-         list_view_ref sur ce champ dans stock/views/stock_move_views.xml). -->
+    -->
+    
     <record id="view_stock_move_line_operation_tree_project" model="ir.ui.view">
         <field name="name">stock.move.line.operations.list.project</field>
         <field name="model">stock.move.line</field>

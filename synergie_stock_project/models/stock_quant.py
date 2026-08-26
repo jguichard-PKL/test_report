@@ -20,22 +20,21 @@ class StockQuant(models.Model):
     )
 
     def _get_gather_domain(self, product_id, location_id, lot_id=None, package_id=None, owner_id=None, strict=False):
-        """Restreint les quants candidats à la réservation au projet demandé.
+        """Restreint les quants candidats à la réservation de stock au projet demandé.
 
-        _get_gather_domain() est LE point où le cœur construit le domaine de
+        _get_gather_domain() est LE point où le core Odoo construit le domaine de
         recherche des quants pour toute réservation (_gather / _get_available_quantity
-        / _get_reserve_quantity en découlent tous). Le cœur lui-même y lit déjà
+        / _get_reserve_quantity en découlent tous). Le core lui-même y lit déjà
         une clé de contexte ('with_expiration') pour étendre le domaine sans
-        toucher aux appelants : on suit le même idiome avec 'restrict_project_id',
+        toucher aux appelants : on suit la même logique avec 'restrict_project_id',
         posé par stock.move._update_reserved_quantity() (cf. stock_move.py) quand
         le mouvement porte un projet.
 
         [À vérifier v19] Un quant sans lot (produit non tracké) ne matche jamais
         un restrict_project_id posé (lot_id.project_id est vide sur False) : un
-        mouvement projeté ne réserve donc que du stock lot-tracké et projeté,
+        mouvement avec projet ne réserve donc que du stock avec lot et projet,
         jamais du stock générique non tracké. Cohérent avec le modèle du module
-        (le projet vit sur le lot), mais à confirmer si des flux non trackés
-        doivent un jour porter un projet.
+        (le projet vit sur le lot).
         """
         domain = super()._get_gather_domain(
             product_id, location_id, lot_id=lot_id, package_id=package_id, owner_id=owner_id, strict=strict

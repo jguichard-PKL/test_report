@@ -3,7 +3,7 @@
 
     <!-- Formulaire mouvement de stock : champ Projet (éditable).
          Le projet est auto-calculé (compute) mais reste modifiable.
-         [À vérifier v19] id de vue : stock.view_move_form -->
+    -->
     <record id="view_move_form_project" model="ir.ui.view">
         <field name="name">stock.move.form.project</field>
         <field name="model">stock.move</field>
@@ -23,7 +23,7 @@
          champ chargé sur ce formulaire précis, le domaine ne filtrait jamais
          (parent.project_id non résolu = toujours absent), même avec un
          mouvement correctement projeté.
-         [À vérifier v19] id de vue : stock.view_stock_move_operations. -->
+    -->
     <record id="view_stock_move_operations_project" model="ir.ui.view">
         <field name="name">stock.move.operations.form.project</field>
         <field name="model">stock.move</field>

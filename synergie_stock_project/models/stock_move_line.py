@@ -5,7 +5,7 @@ from odoo import fields, models
 class StockMoveLine(models.Model):
     _inherit = "stock.move.line"
 
-    # Related non stocké : simple relais "à plat" du projet du mouvement
+    # Related non stocké : simple relais "à plat" du projet au mouvement
     # parent. Nécessaire pour être référençable dans le domaine du champ
     # quant_id (widget pick_from, cf. stock_move_line_views.xml) : un domaine
     # de vue ne peut résoudre qu'un champ directement chargé sur
