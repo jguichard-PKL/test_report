@@ -47,6 +47,8 @@ class StockMove(models.Model):
         "raw_material_production_id.project_id",
         "picking_id",
         "picking_id.project_id",
+        "move_dest_ids",
+        "move_dest_ids.project_id",
     )
     def _compute_project_id(self):
         for move in self:
@@ -66,6 +68,21 @@ class StockMove(models.Model):
                 # réservation restreinte par projet ne se déclenche jamais
                 # sur ce flux).
                 move.project_id = move._get_picking_project()
+            elif move.move_dest_ids.mapped("project_id"):
+                # Mouvement AMONT d'une chaîne sans signal direct (ex. le
+                # transfert "Prélever composants" auto-généré par une route de
+                # fabrication multi-étapes : picking système, jamais rempli
+                # manuellement, donc picking_id.project_id toujours vide).
+                # Hérite du projet déjà déterminé sur son mouvement AVAL
+                # (move_dest_ids), lui-même dérivé de l'OF ou du transfert
+                # final. Sans ce relais, ce mouvement amont reste non projeté
+                # et sa propre réservation (MTS, §5) n'est pas restreinte :
+                # il peut alors prélever le composant d'un AUTRE projet vers
+                # l'emplacement tampon, que le mouvement de consommation aval
+                # (lui bien restreint, §5.1) rejettera ensuite — la
+                # réservation semble "fonctionner" mais ne trouve plus jamais
+                # rien de disponible, même quand le bon stock existe ailleurs.
+                move.project_id = move.move_dest_ids.mapped("project_id")[:1]
             else:
                 # Tout autre mouvement : on conserve la valeur courante
                 # (saisie manuelle possible), on ne force pas à False.

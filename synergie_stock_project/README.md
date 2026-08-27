@@ -38,6 +38,10 @@ surcharge de la validation des lignes de mouvement.
    - **Transfert portant un projet** (`picking_id.project_id`, tout type —
      réception, livraison, interne) → hook `_get_picking_project()` →
      `picking_id.project_id` (cf. §4).
+   - **Mouvement amont sans signal direct** (`move_dest_ids.project_id`) →
+     hérite du projet déjà déterminé sur son mouvement **aval** (cf. §5.1 pour
+     le cas concret : le transfert "Prélever composants" auto-généré par une
+     route de fabrication multi-étapes).
    - Sinon → la valeur courante est conservée (saisie manuelle possible),
      jamais forcée à `False`.
 
@@ -185,6 +189,33 @@ Cette couverture rend le filtre robuste au réglage « Étapes de fabrication »
 de vos types d'opération (1, 2 ou 3 étapes) comme au nombre d'étapes de vos
 routes de transfert, sans avoir à les connaître précisément.
 
+⚠️ **Trou trouvé en test réel : la réservation ne trouvait plus jamais de
+stock disponible, malgré un filtrage correct.** Sur une route « Prélever
+composants puis fabriquer », il y a en réalité **deux mouvements distincts** :
+un transfert **"Prélever composants"** auto-généré par Odoo (stock général →
+emplacement tampon), puis la consommation réelle (`raw_material_production_id`,
+tampon → OF), déjà filtrée ci-dessus.
+
+Le transfert "Prélever composants" est un `stock.picking` **généré par le
+système**, jamais rempli manuellement par un utilisateur — son
+`picking_id.project_id` restait donc toujours vide, et sa propre réservation
+(chemin MTS, §5) n'était **pas** restreinte : il pouvait prélever le composant
+d'un **autre projet** (ou sans projet) vers l'emplacement tampon. Le mouvement
+de consommation aval, lui bien restreint, **rejetait** alors ce lot — d'où une
+disponibilité perpétuellement nulle, même quand le bon stock existait ailleurs
+dans l'entrepôt : le filtrage semblait fonctionner (rien du mauvais projet ne
+passait), mais plus rien ne passait du tout.
+
+Corrigé en ajoutant une branche à `_compute_project_id()` (§2) : un mouvement
+sans signal direct (ni `production_id`, ni `raw_material_production_id`, ni
+`picking_id.project_id`) hérite du projet déjà déterminé sur son **mouvement
+aval** (`move_dest_ids.project_id`) — ici, celui de la consommation finale.
+Le transfert "Prélever composants" devient ainsi lui-même projeté, sa propre
+réservation (§5) se restreint en conséquence, et l'emplacement tampon ne
+reçoit alors que le bon composant. Fonctionne aussi bien pour une chaîne à
+plusieurs mouvements amont successifs (dépendance transitive normale du
+compute Odoo) que pour un simple aller-retour à deux étapes.
+
 ### 5.2 Sélection manuelle d'un quant (widget « Pick From »)
 
 La réservation automatique (`_action_assign`) n'est pas le seul chemin pour
@@ -282,6 +313,7 @@ encore) n'est par nature liée à aucun quant existant — rien à filtrer.
 | Saisie d'un lot en texte libre (`lot_name`) | ➖ hors périmètre | pas de quant existant à filtrer (création de lot en réception) |
 | Composants consommés — réservation restreinte par projet | ✅ | `raw_material_production_id.project_id`, MTS **et** MTO (§5, §5.1) |
 | Composants consommés — propagation au lot | ➖ hors périmètre (volontaire) | jamais tamponnés (`_action_done` les exclut explicitement) |
+| Transfert "Prélever composants" (route multi-étapes) | ✅ | hérite du projet via `move_dest_ids.project_id` (§2, §5.1) |
 
 ## 7. Lien avec `synergie_mrp_performance`
 
