@@ -156,24 +156,38 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
         self.ensure_one()
 
         # 0. Hypothèse critique (cf. §0 de la spec) : planned_date_begin/
-        # planned_date_end sont ajoutés par le module Enterprise
-        # project_enterprise — ILS N'EXISTENT PAS comme champs sur
-        # project.task en Community (vérifié directement dans les sources
-        # cœur project/models/project_task.py, pas seulement absents d'une
-        # vue). Un create() dessus planterait sur une base Community. On
-        # arrête ici, explicitement, plutôt que de laisser échouer create()
-        # avec une erreur ORM peu explicite.
-        if "planned_date_begin" not in self.env["project.task"]._fields:
+        # planned_date_end sont supposés ajoutés par le module Enterprise
+        # project_enterprise, absents sur une base Community. Un create()
+        # dessus planterait si absents. On arrête ici, explicitement, plutôt
+        # que de laisser échouer create() avec une erreur ORM peu explicite.
+        #
+        # ⚠️ Trou corrigé, rencontré en test réel : on ne vérifiait au
+        # départ que 'planned_date_begin', en supposant les deux champs
+        # toujours présents ensemble (ils le sont dans project_enterprise
+        # côté sources publiques). Sur l'instance de test, 'planned_date_begin'
+        # existe mais PAS 'planned_date_end' — origine exacte non confirmée
+        # (autre module installé fournissant un champ de même nom pour un
+        # usage différent ? champ renommé dans une variante de Gantt ?
+        # project_enterprise non public, impossible à vérifier depuis cet
+        # environnement). On vérifie donc explicitement les DEUX champs,
+        # plutôt que de supposer leur présence liée.
+        missing_fields = [
+            f
+            for f in ("planned_date_begin", "planned_date_end")
+            if f not in self.env["project.task"]._fields
+        ]
+        if missing_fields:
             raise UserError(
                 _(
-                    "Ce prototype nécessite le module Enterprise "
-                    "'project_enterprise' (champs planned_date_begin / "
-                    "planned_date_end, vue Gantt), qui n'est pas installé "
-                    "sur cette base. Deux options : installer un module "
-                    "Gantt tiers compatible pour ce test, ou retirer ce "
-                    "point du périmètre du prototype (dates calculées et "
+                    "Ce prototype nécessite les champs %(fields)s sur "
+                    "project.task (normalement ajoutés par le module "
+                    "Enterprise 'project_enterprise', vue Gantt), absent(s) "
+                    "sur cette base. Deux options : installer/activer le "
+                    "module fournissant ces champs pour ce test, ou retirer "
+                    "ce point du périmètre du prototype (dates calculées et "
                     "dépendances natives uniquement, sans rendu Gantt) — "
-                    "cf. §0 de la spécification technique."
+                    "cf. §0 de la spécification technique.",
+                    fields=", ".join(missing_fields),
                 )
             )
 

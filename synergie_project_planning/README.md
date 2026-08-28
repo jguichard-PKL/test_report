@@ -14,29 +14,43 @@ même sur une base **Community** — cf. §0.
 
 ## 0. Hypothèse critique : Enterprise vs Community
 
-⚠️ **Confirmé en test réel d'installation, pas seulement en théorie** :
-`project_enterprise` n'est pas installé sur l'instance de test
-(`jguichard-pkl-test-report-lot-stock-....dev.odoo.com`). Première tentative
-d'installation en échec (`ValueError: Wrong @depends... Dependency field
-'planned_date_end' not found in model project.task`) — corrigé depuis (voir
-`_compute_x_deviation_days` ci-dessous) : le module s'installe désormais
-correctement sur cette base.
+⚠️ **Situation réelle plus nuancée que prévu, découverte en test** : sur
+l'instance de test
+(`jguichard-pkl-test-report-lot-stock-....dev.odoo.com`),
+`planned_date_begin` **existe** sur `project.task`, mais `planned_date_end`
+**n'existe pas** — ce n'est donc pas un simple « Community vs Enterprise »
+binaire comme anticipé par la spec. Origine exacte non confirmée depuis cet
+environnement (`project_enterprise` n'étant pas public, impossible de
+vérifier son code source comme pour le reste du cœur Odoo) : soit un autre
+module installé sur cette instance fournit un champ `planned_date_begin`
+pour un usage sans rapport avec le Gantt, soit la structure réelle diffère
+de ce que documente la spec. **À creuser directement dans Réglages >
+Technique > Base de données > Champs (modèle `project.task`, recherche
+« planned »/« date ») si vous voulez identifier précisément ce qui existe.**
+
+Première tentative d'installation en échec (`ValueError: Wrong @depends...
+Dependency field 'planned_date_end' not found in model project.task`) —
+corrigée (voir `_compute_x_deviation_days` ci-dessous). Le module s'installe
+désormais correctement.
 
 La spec (§0) demande explicitement de vérifier l'édition de la base avant de
 commencer, et d'arrêter/remonter le point si Community. Plutôt que de
 trancher ça à l'avance (aucun accès à votre instance de test depuis cet
 environnement), **le wizard vérifie ce prérequis lui-même, à l'exécution** :
 
-- `project.task.planned_date_begin` / `planned_date_end` sont ajoutés par le
-  module Enterprise `project_enterprise` — **vérifié en lisant directement
-  le code source**
-  `project/models/project_task.py` (branche 19.0) : ces champs **n'existent
-  pas du tout** sur `project.task` en Community, pas juste absents d'une vue.
-- `action_generate()` vérifie `"planned_date_begin" in
-  self.env["project.task"]._fields` **avant** toute création de tâche. Si
-  absent, il lève une `UserError` explicite plutôt que de laisser échouer
-  `create()` avec une erreur ORM peu lisible, ou pire, de créer des tâches
-  à moitié correctes.
+- `project.task.planned_date_begin` / `planned_date_end` sont *supposés*
+  ajoutés ensemble par le module Enterprise `project_enterprise` — cf.
+  ci-dessus, ce n'est en réalité pas si simple sur cette instance.
+- `action_generate()` vérifie **les deux champs séparément**
+  (`missing_fields`, pas seulement `planned_date_begin`) **avant** toute
+  création de tâche. Si l'un des deux manque, il lève une `UserError`
+  explicite plutôt que de laisser échouer `create()` avec une erreur ORM peu
+  lisible. ⚠️ **Bug corrigé, rencontré en test réel** : la première version
+  ne vérifiait que `planned_date_begin`, en supposant les deux champs
+  toujours présents ensemble — insuffisant ici puisque `planned_date_begin`
+  existe seul sur cette instance ; `create()` plantait quand même sur
+  `planned_date_end`, avec un message ORM générique (`Invalid field
+  'planned_date_end' in 'project.task'`) au lieu du message explicite voulu.
 - Aucune vue XML de ce module ne référence `planned_date_begin`/
   `planned_date_end` directement (ça ferait échouer l'**installation** du
   module sur Community, pas juste son exécution). Quand `project_enterprise`
