@@ -205,6 +205,15 @@ calendrier mal configuré.
 - [views/project_project_views.xml](views/project_project_views.xml) : bouton d'accès au wizard.
 - [wizard/project_planning_generate_wizard_views.xml](wizard/project_planning_generate_wizard_views.xml) : formulaire du wizard + action.
 
+⚠️ **Piège rencontré en test réel, corrigé** : `project_project_views.xml`
+référence l'action du wizard via `%(synergie_project_planning.action_...)d`.
+Les fichiers XML d'un module sont chargés dans l'**ordre exact** de la liste
+`data` du manifeste ; une référence en avant vers un XML ID pas encore
+chargé échoue immédiatement à l'installation
+(`ValueError: External ID not found in the system`). Le manifeste liste donc
+`wizard/project_planning_generate_wizard_views.xml` **avant**
+`views/project_project_views.xml`.
+
 ## 6. Scénario de test
 
 Reprendre le scénario de la spec technique §6 (non dupliqué ici pour éviter

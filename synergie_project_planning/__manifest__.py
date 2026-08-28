@@ -41,8 +41,13 @@ Ce module ne modifie et ne dépend d'AUCUN modèle mrp.* ou stock.* existant.
         "security/ir.model.access.csv",
         "data/ir_config_parameter_data.xml",
         "views/project_task_views.xml",
-        "views/project_project_views.xml",
+        # AVANT project_project_views.xml : ce dernier référence l'action du
+        # wizard (%(...)d) définie ici. Les fichiers XML sont chargés dans
+        # l'ordre exact de cette liste ; une référence en avant vers un XML
+        # ID pas encore chargé échoue immédiatement (confirmé en test réel :
+        # "External ID not found in the system" à l'installation).
         "wizard/project_planning_generate_wizard_views.xml",
+        "views/project_project_views.xml",
     ],
     "installable": True,
     "application": False,
