@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- Paramètre système (§2.3) : temps unitaire par défaut (min/pièce)
+         pour les étapes proportionnelles. Valeur prototype : 1.
+         noupdate="1" : ne pas écraser une valeur modifiée manuellement par
+         l'utilisateur lors d'une mise à jour du module. -->
+    <record id="default_unit_time_minutes_param" model="ir.config_parameter">
+        <field name="key">planning.default_unit_time_minutes</field>
+        <field name="value">1</field>
+    </record>
+
+</odoo>
