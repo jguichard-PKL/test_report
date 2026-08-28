@@ -97,16 +97,34 @@ class ProjectTask(models.Model):
                     task.x_planned_qty * task.x_unit_time_minutes / 60.0
                 )
 
-    @api.depends("x_actual_end_date", "planned_date_end")
+    # ⚠️ 'planned_date_end' N'EST PAS dans @api.depends volontairement : ce
+    # champ n'existe que si 'project_enterprise' est installé (absent du
+    # modèle en Community, pas seulement d'une vue — cf. README §0). Le
+    # référencer dans @api.depends casse l'INSTALLATION du module entier
+    # (ValueError "Wrong @depends" à la construction du registre, avant même
+    # qu'un utilisateur touche à quoi que ce soit) sur une base qui ne l'a
+    # pas — confirmé en test réel. On ne dépend donc que de x_actual_end_date
+    # (champ propre à ce module, toujours présent) et on lit planned_date_end
+    # dynamiquement dans le corps de la méthode, seulement s'il existe.
+    #
+    # Conséquence assumée : si project_enterprise EST installé et que
+    # planned_date_end change après coup (ex. glissé dans le Gantt),
+    # x_deviation_days ne se recalcule PAS automatiquement (pas dans les
+    # dépendances) — il faudra rouvrir/resauvegarder la tâche, ou déclencher
+    # un recompute manuel. Acceptable pour ce prototype : le déclencheur
+    # principal reste la saisie de x_actual_end_date par l'admin.
+    @api.depends("x_actual_end_date")
     def _compute_x_deviation_days(self):
         # [Limite assumée] x_deviation_days est un Float : sans valeur
         # calculable il est mis à 0.0, pas "vide" au sens strict (un champ
         # Float ne distingue pas 0 de "non renseigné" dans les vues standard).
         # Cohérent avec la simplicité demandée pour ce prototype ; à
         # reconsidérer (ex. widget dédié) si ça prête à confusion en démo.
+        has_planned_end = "planned_date_end" in self._fields
         for task in self:
-            if task.x_actual_end_date and task.planned_date_end:
-                delta = task.x_actual_end_date - task.planned_date_end.date()
+            planned_end = task.planned_date_end if has_planned_end else False
+            if task.x_actual_end_date and planned_end:
+                delta = task.x_actual_end_date - planned_end.date()
                 task.x_deviation_days = delta.days
             else:
                 task.x_deviation_days = 0.0

@@ -14,6 +14,14 @@ même sur une base **Community** — cf. §0.
 
 ## 0. Hypothèse critique : Enterprise vs Community
 
+⚠️ **Confirmé en test réel d'installation, pas seulement en théorie** :
+`project_enterprise` n'est pas installé sur l'instance de test
+(`jguichard-pkl-test-report-lot-stock-....dev.odoo.com`). Première tentative
+d'installation en échec (`ValueError: Wrong @depends... Dependency field
+'planned_date_end' not found in model project.task`) — corrigé depuis (voir
+`_compute_x_deviation_days` ci-dessous) : le module s'installe désormais
+correctement sur cette base.
+
 La spec (§0) demande explicitement de vérifier l'édition de la base avant de
 commencer, et d'arrêter/remonter le point si Community. Plutôt que de
 trancher ça à l'avance (aucun accès à votre instance de test depuis cet
@@ -36,6 +44,23 @@ environnement), **le wizard vérifie ce prérequis lui-même, à l'exécution** 
   côté ce module.
 - L'action de retour du wizard (§4.3 point 6) détecte aussi dynamiquement si
   `project_enterprise` est installé pour proposer la vue Gantt, sinon liste.
+
+⚠️ **Piège distinct, rencontré en test réel** : le garde-fou runtime du
+wizard (ci-dessus) ne protège que l'**exécution** du wizard — il ne protège
+PAS l'**installation** du module. Le champ `x_deviation_days`
+([models/project_task.py](models/project_task.py)) avait initialement
+`planned_date_end` dans son `@api.depends`. Odoo valide les `@api.depends`
+à la **construction du registre** (donc à l'install/upgrade du module, avant
+même qu'un utilisateur touche à quoi que ce soit) — un `@api.depends` sur un
+champ absent du modèle fait échouer l'installation entière avec
+`ValueError: Wrong @depends`, sans rapport avec le garde-fou runtime du
+wizard. Corrigé en ne dépendant que de `x_actual_end_date` (champ propre à
+ce module, toujours présent) et en lisant `planned_date_end` dynamiquement
+dans le corps de la méthode, seulement s'il existe (`"planned_date_end" in
+self._fields`). Conséquence assumée : si `project_enterprise` est installé
+et que `planned_date_end` change après coup (ex. glissé dans le Gantt),
+`x_deviation_days` ne se recalcule pas automatiquement — il faudra
+rouvrir/resauvegarder la tâche.
 
 **Conséquence pratique** : sur une base Community, le wizard refuse de
 générer quoi que ce soit tant que ce point n'est pas résolu (module Gantt
