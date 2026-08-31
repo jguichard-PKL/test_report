@@ -13,6 +13,10 @@ class StockMove(models.Model):
     # mais reste modifiable manuellement. Une modif manuelle persiste tant
     # qu'aucune dépendance du compute ne change.
     # index=True : filtres et group_by fréquents par projet.
+    # recursive=True : le compute dépend de move_dest_ids.project_id, donc
+    # de lui-même via la chaîne de mouvements (propagation amont, cf.
+    # _compute_project_id) — sans ce flag Odoo lève un UserWarning au
+    # build (triggers mal construits sur une chaîne de profondeur > 1).
     # ------------------------------------------------------------------
     project_id = fields.Many2one(
         "project.project",
@@ -21,6 +25,7 @@ class StockMove(models.Model):
         store=True,
         readonly=False,
         index=True,
+        recursive=True,
         help=(
             "Projet de rattachement du mouvement de stock, dérivé de la "
             "transaction source (ordre de fabrication ou réception). "
