@@ -8,8 +8,8 @@
             <form string="Générer la planification prévisionnelle">
                 <field name="project_id" invisible="1"/>
                 <group>
-                    <field name="start_datetime"/>
-                    <field name="input_qty"/>
+                    <field name="expected_reception_date"/>
+                    <field name="expected_qty"/>
                 </group>
                 <footer>
                     <button name="action_generate" type="object" string="Générer" class="btn-primary"/>

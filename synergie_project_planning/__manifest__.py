@@ -1,26 +1,26 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Synergie - Planification prévisionnelle du flux de production (Prototype)",
-    "version": "19.0.6.0.0",
+    "version": "19.0.8.0.0",
     "summary": "Maquette : génère 3 tâches + 2 jalons prévisionnels dans le "
-    "Gantt Enterprise, à partir d'une quantité et d'une date de début",
+    "Gantt, à partir d'une date de réception prévue et d'un nombre de pièces",
     "description": """
 Prototype de démonstration — pas un livrable de production.
 
 Cf. Spec_Technique_Prototype_ClaudeCode.md pour le cadrage initial, et le
-README de ce module pour l'historique complet des arbitrages (§6 : 4
-versions successives, dont l'identification du bon couple de champs de date).
+README de ce module pour l'historique complet des arbitrages (§6).
 
 Principes :
-- Un wizard (assistant), lancé depuis la fiche projet, prend une quantité et
-  une date de début, et génère 3 project.task chaînées par les dépendances
-  natives (depend_on_ids) + 2 project.milestone, selon des règles de date
-  fixes en dur (cf. wizard).
-- Les dates sont écrites sur planned_date_begin (début, ajouté par un module
-  Gantt type project_enterprise) et date_deadline (fin, Community natif,
-  toujours présent) — c'est le couple réellement utilisé par Odoo pour la
-  vue Gantt, PAS planned_date_end comme le supposaient des versions
-  précédentes de ce module. Cf. README §0 pour comment ça a été identifié.
+- Un wizard (assistant), lancé depuis la fiche projet, prend une date de
+  réception prévue et un nombre de pièces prévues, et génère 3 project.task
+  chaînées par les dépendances natives (depend_on_ids) + 2 project.milestone,
+  selon des règles de date fixes en dur (cf. wizard).
+- Les dates sont écrites sur date_deadline (Community natif, toujours
+  présent) — seul champ de date utilisé pour la planification. Le champ
+  planned_date_begin (ajouté par un module Gantt type project_enterprise,
+  non garanti) a été écarté sur demande : chaque tâche s'affiche donc comme
+  un point dans le Gantt plutôt qu'une barre avec une durée visible.
+  Cf. README §0 pour l'historique de cette décision.
 - Un champ de date réelle de fin + un écart calculé permettent un suivi
   manuel prévisionnel/réel, sans aucun lien automatique avec les OF/mouvements
   de stock existants (hors périmètre strict, cf. README).
@@ -32,10 +32,9 @@ Ce module ne modifie et ne dépend d'AUCUN modèle mrp.* ou stock.* existant.
     "license": "LGPL-3",
     "category": "Services/Project",
     # 'project' : project.task, project.project, project.milestone,
-    # dépendances de tâches natives, date_deadline — tout Community. Pas de
-    # dépendance dure à 'project_enterprise' (le module doit pouvoir
-    # s'installer même sans), mais son absence bloque explicitement
-    # action_generate() (planned_date_begin manquant) — cf. README §0.
+    # dépendances de tâches natives, date_deadline — tout Community. Aucune
+    # dépendance, même souple, à 'project_enterprise' : ce module n'utilise
+    # plus aucun champ non garanti (cf. README §0).
     "depends": ["project"],
     "data": [
         "security/ir.model.access.csv",

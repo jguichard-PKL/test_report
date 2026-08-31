@@ -21,12 +21,11 @@ class ProjectTask(models.Model):
         "suivantes (choix assumé, cf. README).",
     )
 
-    # date_deadline (fin, natif) peut être référencé directement dans
-    # @api.depends : contrairement à planned_date_begin/planned_date_end,
-    # c'est un champ Community natif toujours présent (pas ajouté par un
-    # module Gantt) — confirmé dans les sources (project/models/
-    # project_task.py). Pas besoin du contournement utilisé dans une version
-    # précédente pour planned_date_end (absent sur l'instance cible).
+    # date_deadline peut être référencé directement dans @api.depends : champ
+    # Community natif, toujours présent — confirmé dans les sources
+    # (project/models/project_task.py). C'est le seul champ de date utilisé
+    # par ce module pour la planification (cf. README) ; pas de risque de
+    # champ absent à gérer ici.
     @api.depends("x_actual_end_date", "date_deadline")
     def _compute_x_deviation_days(self):
         # [Limite assumée] x_deviation_days est un Float : sans valeur
