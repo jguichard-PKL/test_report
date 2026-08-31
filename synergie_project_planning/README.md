@@ -93,7 +93,6 @@ pas tout littéralement, deux points ont été tranchés :
 
 | Champ | Type | Détail |
 |---|---|---|
-| `x_generated_by_wizard` | Boolean | Marqueur pour le garde-fou d'idempotence du wizard. |
 | `x_actual_end_date` | Date | Saisie manuelle admin, aucun lien avec un OF. |
 | `x_deviation_days` | Float, computed, stored | = date réelle − `date_deadline` (natif), en jours. |
 
@@ -134,14 +133,18 @@ Seulement `project_id` (caché, `default` = `active_id`), `start_datetime`,
 `input_qty`. Tous les autres champs de la version précédente (bumping,
 températures, rendements) ont été **supprimés**, pas juste masqués.
 
-### 3.2 Garde-fous, dans l'ordre
+### 3.2 Garde-fou
 
-1. **`planned_date_begin` présent ?** (§0) — `UserError` explicite si absent,
-   **avant** toute création de tâche. `date_deadline` n'a pas besoin d'être
-   vérifié : c'est un champ Community, toujours présent.
-2. **Idempotence** — si une tâche `x_generated_by_wizard = True` existe déjà
-   pour le projet, le wizard bloque avec un message explicite plutôt que de
-   dupliquer.
+**`planned_date_begin` présent ?** (§0) — `UserError` explicite si absent,
+**avant** toute création de tâche. `date_deadline` n'a pas besoin d'être
+vérifié : c'est un champ Community, toujours présent.
+
+⚠️ **Garde-fou d'idempotence retiré sur demande** (y compris le champ
+`x_generated_by_wizard` qui le portait, supprimé) : le wizard ne bloque plus
+si une planification existe déjà pour le projet — il génère systématiquement
+3 nouvelles tâches + 2 nouveaux jalons à chaque clic, sans vérifier ni
+supprimer ce qui existe déjà. Relancer plusieurs fois sur le même projet
+**empile** les tâches/jalons plutôt que de les remplacer.
 
 ### 3.3 Action de retour
 
@@ -195,9 +198,17 @@ dans ce module.
 - **v3 (abandonnée)** : retour sur des champs natifs, mais toujours
   `planned_date_begin`/`planned_date_end` — le wizard échouait proprement
   (message explicite) faute de `planned_date_end`, sans résoudre le fond.
-- **v4 (actuelle)** : **bon couple de champs identifié** —
-  `planned_date_begin` (début) + `date_deadline` (fin), pas
-  `planned_date_end`. Découvert en observant le comportement réel de l'UI
-  (bouton "Toggle date range mode" sur le champ *Deadline* de la tâche).
-  `date_deadline` est Community natif, toujours présent ; `planned_date_begin`
-  reste le seul champ dont la présence est vérifiée avant génération. Cf. §0.
+- **v4** : **bon couple de champs identifié** — `planned_date_begin` (début)
+  + `date_deadline` (fin), pas `planned_date_end`. Découvert en observant le
+  comportement réel de l'UI (bouton "Toggle date range mode" sur le champ
+  *Deadline* de la tâche). `date_deadline` est Community natif, toujours
+  présent ; `planned_date_begin` reste le seul champ dont la présence est
+  vérifiée avant génération. Cf. §0.
+- **v5** : garde-fou d'idempotence retiré sur demande (§3.2) — le wizard
+  régénère systématiquement 3 tâches + 2 jalons à chaque clic, sans bloquer
+  ni nettoyer une planification déjà existante sur le projet. Le champ
+  `x_generated_by_wizard` qui le portait était laissé en place, réduit à un
+  simple marqueur indicatif.
+- **v6 (actuelle)** : `x_generated_by_wizard` supprimé entièrement (champ,
+  vue, création dans le wizard) — devenu sans usage une fois le garde-fou
+  retiré (v5).

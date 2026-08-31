@@ -5,12 +5,6 @@ from odoo import api, fields, models
 class ProjectTask(models.Model):
     _inherit = "project.task"
 
-    x_generated_by_wizard = fields.Boolean(
-        string="Générée par le wizard",
-        default=False,
-        help="Marqueur technique posé par le wizard de génération, utilisé "
-        "par son garde-fou d'idempotence (une seule génération par projet).",
-    )
     x_actual_end_date = fields.Date(
         string="Date réelle de fin",
         help="Saisie manuelle par l'admin lorsque l'étape est effectivement "

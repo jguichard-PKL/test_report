@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Synergie - Planification prévisionnelle du flux de production (Prototype)",
-    "version": "19.0.4.0.0",
+    "version": "19.0.6.0.0",
     "summary": "Maquette : génère 3 tâches + 2 jalons prévisionnels dans le "
     "Gantt Enterprise, à partir d'une quantité et d'une date de début",
     "description": """

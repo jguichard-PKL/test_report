@@ -33,9 +33,6 @@
                             <field name="x_deviation_days"/>
                         </group>
                     </group>
-                    <group>
-                        <field name="x_generated_by_wizard" readonly="1"/>
-                    </group>
                 </page>
             </notebook>
         </field>

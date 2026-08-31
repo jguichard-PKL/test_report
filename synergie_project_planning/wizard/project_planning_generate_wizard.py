@@ -89,22 +89,6 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
                 )
             )
 
-        # 1. Garde-fou d'idempotence.
-        already_generated = self.env["project.task"].search_count(
-            [
-                ("project_id", "=", self.project_id.id),
-                ("x_generated_by_wizard", "=", True),
-            ]
-        )
-        if already_generated:
-            raise UserError(
-                _(
-                    "Une planification existe déjà pour ce projet. "
-                    "Supprimez les tâches générées existantes avant de "
-                    "relancer le wizard."
-                )
-            )
-
         if not self.project_id.allow_task_dependencies:
             self.project_id.allow_task_dependencies = True
         if not self.project_id.allow_milestones:
@@ -119,7 +103,6 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
             {
                 "name": "A - Réception",
                 "project_id": self.project_id.id,
-                "x_generated_by_wizard": True,
                 "planned_date_begin": begin_a,
                 "date_deadline": end_a,
             }
@@ -132,7 +115,6 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
             {
                 "name": "B",
                 "project_id": self.project_id.id,
-                "x_generated_by_wizard": True,
                 "planned_date_begin": begin_b,
                 "date_deadline": end_b,
                 "depend_on_ids": [(6, 0, task_a.ids)],
@@ -146,7 +128,6 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
             {
                 "name": "C",
                 "project_id": self.project_id.id,
-                "x_generated_by_wizard": True,
                 "planned_date_begin": begin_c,
                 "date_deadline": end_c,
                 "depend_on_ids": [(6, 0, task_b.ids)],
