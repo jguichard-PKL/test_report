@@ -3,12 +3,10 @@ from datetime import datetime, time, timedelta
 
 from odoo import _, fields, models
 
-# Temps de traitement unitaire, en dur pour cette maquette (plus de
-# paramètre système ni de champ configurable — cf. README).
+# Temps de traitement unitaire, en dur pour cette maquette
 MINUTES_PER_PIECE = 10
 
-# Heure de reprise le "lendemain" d'une fin de tâche (confirmé côté client :
-# 9h00 fixe, pas la même heure que la fin de la tâche précédente).
+# Heure de reprise le "lendemain" d'une fin de tâche
 NEXT_DAY_START_TIME = time(9, 0)
 
 
@@ -37,23 +35,12 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
         return datetime.combine(dt.date() + timedelta(days=1), at_time)
 
     def action_generate(self):
-        """Génère 3 tâches + 2 jalons à partir de deux entrées seulement
-        (date de réception prévue, nombre de pièces prévues) — règles de
-        date FIXES, pas de catalogue de flow ni de rendement.
+        """Génère 3 tâches + 2 jalons à partir de deux saisies sur le Wizard
+        (date de réception prévue, nombre de pièces prévues)
 
         `planned_date_begin` (début) ET `date_deadline` (fin) sont posés sur
         chaque tâche, pour qu'elle s'affiche en mode "plage" (barre) dans le
-        Gantt. Confirmé en test réel que sans `planned_date_begin`, une
-        tâche n'apparaît PAS DU TOUT dans le Gantt — pas juste comme un
-        point.
-
-        ⚠️ `planned_date_begin` n'est PAS un champ garanti sur toute
-        installation (ajouté par un module Gantt type project_enterprise,
-        absent en Community) — sa présence n'est plus vérifiée ici (garde-fou
-        retiré sur demande). S'il est absent, `create()` échoue avec une
-        erreur ORM brute (`Invalid field 'planned_date_begin' in
-        'project.task'`) plutôt qu'un message explicite. Cf. README §0 pour
-        comment vérifier sa présence en amont, fonctionnellement.
+        Gantt.
 
         - Tâche A : début = date de réception ; fin = début + (qty × 10 min).
         - Tâche B (bloquée par A, liée au jalon "Jalon 1") : début =
@@ -64,7 +51,7 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
         - Jalon "Deadline" : échéance = fin de la tâche C + 48h.
 
         Ne pose aucun tag (project.tags) : laissé à la saisie manuelle sur
-        chaque tâche, décision explicite (cf. README).
+        chaque tâche
         """
         self.ensure_one()
 
@@ -80,7 +67,7 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
         end_a = begin_a + piece_duration
         task_a = self.env["project.task"].create(
             {
-                "name": "A - Réception",
+                "name": "Opération A - Réception",
                 "project_id": self.project_id.id,
                 "planned_date_begin": begin_a,
                 "date_deadline": end_a,
@@ -101,7 +88,7 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
         end_b = begin_b + timedelta(hours=48)
         task_b = self.env["project.task"].create(
             {
-                "name": "B",
+                "name": "Opération B",
                 "project_id": self.project_id.id,
                 "planned_date_begin": begin_b,
                 "date_deadline": end_b,
@@ -115,7 +102,7 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
         end_c = begin_c + timedelta(hours=24) + piece_duration
         task_c = self.env["project.task"].create(
             {
-                "name": "C",
+                "name": "Opération C",
                 "project_id": self.project_id.id,
                 "planned_date_begin": begin_c,
                 "date_deadline": end_c,
@@ -136,9 +123,6 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
         return self._get_result_action(created_tasks)
 
     def _get_result_action(self, tasks):
-        """Vue Gantt si project_enterprise est installé, sinon liste —
-        détection dynamique plutôt que supposée.
-        """
         self.ensure_one()
         gantt_available = bool(
             self.env["ir.module.module"]

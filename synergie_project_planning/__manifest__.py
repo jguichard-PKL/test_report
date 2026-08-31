@@ -7,9 +7,6 @@
     "description": """
 Prototype de démonstration — pas un livrable de production.
 
-Cf. Spec_Technique_Prototype_ClaudeCode.md pour le cadrage initial, et le
-README de ce module pour l'historique complet des arbitrages (§6).
-
 Principes :
 - Un wizard (assistant), lancé depuis la fiche projet, prend une date de
   réception prévue et un nombre de pièces prévues, et génère 3 project.task
@@ -18,10 +15,7 @@ Principes :
 - Les dates sont écrites sur planned_date_begin (début, ajouté par un module
   Gantt type project_enterprise, présence vérifiée avant génération) et
   date_deadline (fin, Community natif, toujours présent) — pour que chaque
-  tâche s'affiche comme une barre avec sa durée dans le Gantt. Cf. README §0
-  pour l'historique de cette décision (confirmé en test réel : sans
-  planned_date_begin, une tâche n'apparaît pas du tout dans le Gantt).
-- La tâche B est liée au jalon "Jalon 1" via milestone_id.
+  tâche s'affiche comme une barre avec sa durée dans le Gantt.
 - Un champ de date réelle de fin + un écart calculé permettent un suivi
   manuel prévisionnel/réel, sans aucun lien automatique avec les OF/mouvements
   de stock existants (hors périmètre strict, cf. README).
