@@ -6,10 +6,14 @@
          <notebook>, pas ancrée à une page cœur précise) pour rester robuste
          si l'ordre/le nom des pages cœur change.
 
-         Ne référence pas date_deadline : déjà natif au formulaire tâche
-         cœur, rien à ajouter côté ce module. planned_date_begin n'est plus
-         utilisé du tout par ce module (cf. README) — pas de risque à
-         gérer ici.
+         Ne référence NI date_deadline NI planned_date_begin : ce sont des
+         champs cœur, déjà affichés par les vues Enterprise/formulaire tâche
+         quand disponibles — rien à ajouter côté ce module. Important pour
+         planned_date_begin en particulier : le citer dans une vue XML
+         casserait l'INSTALLATION du module si le champ est absent (pas
+         garanti partout, cf. README §0) — la Python (wizard) le vérifie
+         dynamiquement avant de générer, mais une vue statique ne peut pas
+         faire ce genre de vérification conditionnelle.
 
          depend_on_ids n'est pas repris ici : déjà éditable nativement via
          la page cœur "Blocked By" (project.view_task_form2), visible dès

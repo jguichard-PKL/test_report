@@ -2,6 +2,7 @@
 from datetime import datetime, time, timedelta
 
 from odoo import _, fields, models
+from odoo.exceptions import UserError
 
 # Temps de traitement unitaire, en dur pour cette maquette (plus de
 # paramètre système ni de champ configurable — cf. README).
@@ -41,18 +42,20 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
         (date de réception prévue, nombre de pièces prévues) — règles de
         date FIXES, pas de catalogue de flow ni de rendement.
 
-        Seul `date_deadline` (natif Community, toujours présent) est posé
-        sur chaque tâche pour représenter sa date planifiée. `planned_date_begin`
-        (natif, mais ajouté par un module Gantt type project_enterprise et
-        donc non garanti) n'est volontairement plus utilisé — décision
-        explicite : cf. README pour l'historique et le compromis assumé
-        (chaque tâche s'affiche comme un point dans le Gantt, pas une barre
-        avec une durée visible).
+        `planned_date_begin` (début) ET `date_deadline` (fin) sont posés sur
+        chaque tâche, pour qu'elle s'affiche en mode "plage" (barre) dans le
+        Gantt. Revenu sur la décision v7 (date_deadline seul) : confirmé en
+        test réel que sans `planned_date_begin`, une tâche n'apparaît PAS DU
+        TOUT dans le Gantt — pas juste comme un point, contrairement à
+        l'hypothèse initiale. `planned_date_begin` reste un champ non
+        garanti partout (ajouté par un module Gantt type project_enterprise,
+        absent en Community) : vérifié avant toute création (cf. README §0).
 
-        - Tâche A : fin = date de réception + (qty × 10 min).
-        - Tâche B (bloquée par A) : fin = lendemain de la fin de A (9h00) + 48h.
-        - Tâche C (bloquée par B) : fin = lendemain de la fin de B (9h00) + 24h
-          + (qty × 10 min).
+        - Tâche A : début = date de réception ; fin = début + (qty × 10 min).
+        - Tâche B (bloquée par A, liée au jalon "Jalon 1") : début =
+          lendemain de la fin de A (9h00) ; fin = début + 48h.
+        - Tâche C (bloquée par B) : début = lendemain de la fin de B (9h00) ;
+          fin = début + 24h + (qty × 10 min).
         - Jalon "Jalon 1" : échéance = date de fin de la tâche A.
         - Jalon "Deadline" : échéance = fin de la tâche C + 48h.
 
@@ -60,6 +63,16 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
         chaque tâche, décision explicite (cf. README).
         """
         self.ensure_one()
+
+        if "planned_date_begin" not in self.env["project.task"]._fields:
+            raise UserError(
+                _(
+                    "Cette maquette nécessite le champ 'planned_date_begin' "
+                    "sur project.task (normalement ajouté par le module "
+                    "Gantt Enterprise 'project_enterprise'), absent sur "
+                    "cette base — cf. §0 du README de ce module."
+                )
+            )
 
         if not self.project_id.allow_task_dependencies:
             self.project_id.allow_task_dependencies = True
@@ -69,45 +82,54 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
         piece_duration = timedelta(minutes=self.expected_qty * MINUTES_PER_PIECE)
 
         # --- Tâche A ---
-        end_a = self.expected_reception_date + piece_duration
+        begin_a = self.expected_reception_date
+        end_a = begin_a + piece_duration
         task_a = self.env["project.task"].create(
             {
                 "name": "A - Réception",
                 "project_id": self.project_id.id,
+                "planned_date_begin": begin_a,
                 "date_deadline": end_a,
             }
         )
 
-        # --- Tâche B (bloquée par A) ---
-        end_b = self._next_day_at(end_a) + timedelta(hours=48)
-        task_b = self.env["project.task"].create(
-            {
-                "name": "B",
-                "project_id": self.project_id.id,
-                "date_deadline": end_b,
-                "depend_on_ids": [(6, 0, task_a.ids)],
-            }
-        )
-
-        # --- Tâche C (bloquée par B) ---
-        end_c = self._next_day_at(end_b) + timedelta(hours=24) + piece_duration
-        task_c = self.env["project.task"].create(
-            {
-                "name": "C",
-                "project_id": self.project_id.id,
-                "date_deadline": end_c,
-                "depend_on_ids": [(6, 0, task_b.ids)],
-            }
-        )
-
-        # --- Jalons ---
-        self.env["project.milestone"].create(
+        # --- Jalon "Jalon 1" (créé ici pour pouvoir être lié à la tâche B) ---
+        milestone_1 = self.env["project.milestone"].create(
             {
                 "name": "Jalon 1",
                 "project_id": self.project_id.id,
                 "deadline": end_a.date(),
             }
         )
+
+        # --- Tâche B (bloquée par A, liée au jalon 1) ---
+        begin_b = self._next_day_at(end_a)
+        end_b = begin_b + timedelta(hours=48)
+        task_b = self.env["project.task"].create(
+            {
+                "name": "B",
+                "project_id": self.project_id.id,
+                "planned_date_begin": begin_b,
+                "date_deadline": end_b,
+                "depend_on_ids": [(6, 0, task_a.ids)],
+                "milestone_id": milestone_1.id,
+            }
+        )
+
+        # --- Tâche C (bloquée par B) ---
+        begin_c = self._next_day_at(end_b)
+        end_c = begin_c + timedelta(hours=24) + piece_duration
+        task_c = self.env["project.task"].create(
+            {
+                "name": "C",
+                "project_id": self.project_id.id,
+                "planned_date_begin": begin_c,
+                "date_deadline": end_c,
+                "depend_on_ids": [(6, 0, task_b.ids)],
+            }
+        )
+
+        # --- Jalon "Deadline" ---
         self.env["project.milestone"].create(
             {
                 "name": "Deadline",

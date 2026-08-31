@@ -7,27 +7,29 @@ Cible : **Odoo 19**.
 
 ---
 
-## 0. Champ de date : `date_deadline` seul, décision assumée
+## 0. Champs de date : `planned_date_begin` + `date_deadline`
 
 **L'intérêt de cette maquette est d'utiliser le Gantt — décision du client.**
 Après plusieurs itérations (cf. §6 pour l'historique complet), le module
-s'est arrêté sur un seul champ natif : **`date_deadline`**.
+pose **les deux champs** sur chaque tâche : `planned_date_begin` (début) et
+`date_deadline` (fin).
 
 Confirmé dans les sources cœur (`project/models/project_task.py`, branche
 19.0) : `date_deadline = fields.Datetime(...)` est un champ **Community**
-natif, **toujours présent**, avec précision heure. Aucun risque d'échec à
-l'installation ni à l'exécution, sur aucune instance.
+natif, **toujours présent**. `planned_date_begin`, lui, est ajouté par un
+module Gantt (`project_enterprise` ou équivalent) — **pas garanti présent
+partout**. Le wizard vérifie sa présence avant toute création (`UserError`
+explicite sinon).
 
-⚠️ **Compromis assumé** : une tâche a aussi un champ `planned_date_begin`
-(ajouté par un module Gantt type `project_enterprise`, pas garanti présent)
-qui, combiné à `date_deadline`, permet d'afficher une tâche comme une
-**barre** avec une durée visible dans le Gantt. Ce module n'écrit **plus**
-sur `planned_date_begin` — décision explicite, pour ne dépendre d'aucun
-champ dont la présence varie selon l'instance. Conséquence : chaque tâche
-s'affiche dans le Gantt comme un **point** (sa `date_deadline`), pas une
-barre représentant sa durée calculée. Si la visualisation de durée devient
-importante, il faudra réintroduire `planned_date_begin` (et son garde-fou
-de présence) — cf. §6 v4 pour le code déjà écrit à cet effet.
+⚠️ **Point confirmé en test réel, plus strict qu'anticipé** : une version
+intermédiaire (v7) n'écrivait que `date_deadline`, en pariant qu'une tâche
+s'afficherait au moins comme un point dans le Gantt à défaut d'une barre.
+En pratique, **sans `planned_date_begin`, la tâche n'apparaît pas du tout**
+dans le Gantt tant qu'elle n'est pas basculée manuellement en "mode plage"
+(bouton *Toggle date range mode* sur le champ Deadline). Les deux champs
+sont donc désormais posés systématiquement par le wizard, pour que chaque
+tâche s'affiche directement comme une barre avec sa durée calculée, sans
+bascule manuelle nécessaire.
 
 ## 1. Ce que fait la maquette
 
@@ -37,10 +39,10 @@ Un wizard, lancé depuis la fiche projet (bouton en en-tête — cf. §4), prend
 - **Date de réception prévue** (`expected_reception_date`, date + heure)
 - **Nombre de pièces prévues** (`expected_qty`)
 
-Et génère, en un clic (dates = `date_deadline` de chaque tâche, cf. §0 — le
-"début" ci-dessous n'est qu'un repère de calcul interne, non stocké) :
+Et génère, en un clic (début = `planned_date_begin`, fin = `date_deadline`,
+cf. §0) :
 
-| Tâche | Dépend de | Début (calcul interne) | Fin (`date_deadline`) |
+| Tâche | Dépend de | Début (`planned_date_begin`) | Fin (`date_deadline`) |
 |---|---|---|---|
 | **A** | — | date de réception prévue | début + (qty × 10 min) |
 | **B** | A (« blocked by ») | lendemain de la fin de A, 9h00 | début + 48h |
@@ -48,10 +50,10 @@ Et génère, en un clic (dates = `date_deadline` de chaque tâche, cf. §0 — l
 
 Et 2 jalons (`project.milestone`, natif Community — cf. §2) :
 
-| Jalon | Échéance |
-|---|---|
-| **Jalon 1** | date de fin de la tâche A |
-| **Deadline** | fin de la tâche C + 48h |
+| Jalon | Échéance | Lié à |
+|---|---|---|
+| **Jalon 1** | date de fin de la tâche A | Tâche B (`milestone_id`) |
+| **Deadline** | fin de la tâche C + 48h | — |
 
 ✅ **Interprétations confirmées côté client** — l'énoncé initial ne précisait
 pas tout littéralement, deux points ont été tranchés :
@@ -82,9 +84,10 @@ pas tout littéralement, deux points ont été tranchés :
 | `x_actual_end_date` | Date | Saisie manuelle admin, aucun lien avec un OF. |
 | `x_deviation_days` | Float, computed, stored | = date réelle − `date_deadline` (natif), en jours. |
 
-Champs natifs réutilisés tels quels : `date_deadline` (planification,
-Community, toujours présent — cf. §0), `depend_on_ids` (dépendances,
-Community depuis Odoo 17), `project_id`.
+Champs natifs réutilisés tels quels : `planned_date_begin` (début, Gantt —
+présence vérifiée avant génération), `date_deadline` (fin, Community,
+toujours présent — cf. §0), `depend_on_ids` (dépendances, Community depuis
+Odoo 17), `project_id`, `milestone_id` (lien tâche → jalon, cf. §2.2).
 
 `x_deviation_days` dépend directement de `date_deadline` dans son
 `@api.depends` — safe, puisque c'est un champ Community garanti, aucun
@@ -105,9 +108,9 @@ n'ont pas d'heure, seulement `.date()` de la valeur calculée est stocké).
 soient visibles/utilisables (même mécanique que `allow_task_dependencies`
 pour les dépendances) — le wizard l'active automatiquement si besoin.
 
-Les jalons créés ne sont **pas** liés à une tâche via `task_ids`/
-`milestone_id` (pas demandé) — ce sont des jalons de projet autonomes, avec
-juste le bon nom et la bonne échéance.
+« Jalon 1 » est lié à la **tâche B** via `milestone_id` (créé avant la
+tâche B pour pouvoir renseigner ce lien dès la création). « Deadline » reste
+un jalon de projet autonome, non lié à une tâche.
 
 ## 3. Wizard (`project.planning.generate.wizard`)
 
@@ -117,14 +120,17 @@ Seulement `project_id` (caché, `default` = `active_id`), `expected_reception_da
 `expected_qty`. Tous les autres champs des versions précédentes (bumping,
 températures, rendements) ont été **supprimés**, pas juste masqués.
 
-### 3.2 Aucun garde-fou
+### 3.2 Garde-fou
 
-Ni sur la présence d'un champ (plus nécessaire, `date_deadline` est garanti —
-cf. §0), ni sur l'idempotence (retiré sur demande, avec le champ
+**`planned_date_begin` présent ?** (§0) — `UserError` explicite si absent,
+avant toute création. `date_deadline` n'a pas besoin d'être vérifié : champ
+Community, toujours présent.
+
+Pas de garde-fou d'idempotence (retiré sur demande, avec le champ
 `x_generated_by_wizard` qui le portait, supprimé). Le wizard génère
 systématiquement 3 nouvelles tâches + 2 nouveaux jalons à chaque clic, sans
-rien vérifier ni supprimer. Relancer plusieurs fois sur le même projet
-**empile** les tâches/jalons plutôt que de les remplacer.
+rien vérifier ni supprimer côté données existantes. Relancer plusieurs fois
+sur le même projet **empile** les tâches/jalons plutôt que de les remplacer.
 
 ### 3.3 Action de retour
 
@@ -136,11 +142,13 @@ version initiale du prototype.
 
 - [views/project_task_views.xml](views/project_task_views.xml) : nouvelle page « Planification
   prévisionnelle » sur le formulaire tâche (suivi réel uniquement).
-  `date_deadline` n'est pas repris : déjà natif au formulaire tâche cœur,
-  rien à ajouter côté ce module. `depend_on_ids` et les jalons non plus :
-  déjà natifs (page « Blocked By » / onglet Jalons), visibles dès que
-  `allow_task_dependencies`/`allow_milestones` sont actifs sur le projet
-  (posés par le wizard).
+  Ni `planned_date_begin` ni `date_deadline` ne sont repris : déjà natifs
+  (affichés par les vues Enterprise/formulaire tâche cœur quand
+  disponibles) — les référencer ici, en particulier `planned_date_begin`,
+  casserait l'installation du module si absent (cf. §0). `depend_on_ids` et
+  les jalons non plus : déjà natifs (page « Blocked By » / onglet Jalons),
+  visibles dès que `allow_task_dependencies`/`allow_milestones` sont actifs
+  sur le projet (posés par le wizard).
 - [views/project_project_views.xml](views/project_project_views.xml) : bouton d'accès au wizard sur
   l'en-tête du formulaire **projet** (`project.edit_project`) — **pas**
   visible en cliquant sur la carte du projet depuis le tableau de bord
@@ -195,11 +203,18 @@ dans ce module.
   points dans le Gantt, pas des barres avec une durée visible. Champs du
   wizard renommés en cohérence avec l'usage réel (`expected_reception_date`,
   `expected_qty`).
-- **v8 (actuelle)** : assignation automatique d'un tag par le wizard essayée
-  puis **retirée sur demande** — les tags restent à la discrétion de
+- **v8** : assignation automatique d'un tag par le wizard essayée puis
+  **retirée sur demande** — les tags restent à la discrétion de
   l'utilisateur, saisis manuellement sur chaque tâche. Point vérifié au
   passage et qui reste vrai : `tag_ids` est déjà affiché nativement sur la
   carte Kanban standard des tâches (`project.view_task_kanban`, celle du
   tableau de bord du projet, confirmé dans les sources cœur) — rien à
   ajouter côté vue pour ce module, quelle que soit la façon dont les tags
   sont renseignés.
+- **v9 (actuelle)** : retour sur `planned_date_begin` — confirmé en test
+  réel qu'une tâche sans ce champ n'apparaît **pas du tout** dans le Gantt
+  (pas juste comme un point, contrairement à l'hypothèse de la v7). Les deux
+  champs (`planned_date_begin` + `date_deadline`) sont désormais posés
+  systématiquement, avec le garde-fou de présence de `planned_date_begin`
+  réintroduit. La tâche B est en plus liée au jalon « Jalon 1 » via
+  `milestone_id`.

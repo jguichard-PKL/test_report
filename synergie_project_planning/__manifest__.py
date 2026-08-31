@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Synergie - Planification prévisionnelle du flux de production (Prototype)",
-    "version": "19.0.8.0.0",
+    "version": "19.0.9.0.0",
     "summary": "Maquette : génère 3 tâches + 2 jalons prévisionnels dans le "
     "Gantt, à partir d'une date de réception prévue et d'un nombre de pièces",
     "description": """
@@ -15,12 +15,13 @@ Principes :
   réception prévue et un nombre de pièces prévues, et génère 3 project.task
   chaînées par les dépendances natives (depend_on_ids) + 2 project.milestone,
   selon des règles de date fixes en dur (cf. wizard).
-- Les dates sont écrites sur date_deadline (Community natif, toujours
-  présent) — seul champ de date utilisé pour la planification. Le champ
-  planned_date_begin (ajouté par un module Gantt type project_enterprise,
-  non garanti) a été écarté sur demande : chaque tâche s'affiche donc comme
-  un point dans le Gantt plutôt qu'une barre avec une durée visible.
-  Cf. README §0 pour l'historique de cette décision.
+- Les dates sont écrites sur planned_date_begin (début, ajouté par un module
+  Gantt type project_enterprise, présence vérifiée avant génération) et
+  date_deadline (fin, Community natif, toujours présent) — pour que chaque
+  tâche s'affiche comme une barre avec sa durée dans le Gantt. Cf. README §0
+  pour l'historique de cette décision (confirmé en test réel : sans
+  planned_date_begin, une tâche n'apparaît pas du tout dans le Gantt).
+- La tâche B est liée au jalon "Jalon 1" via milestone_id.
 - Un champ de date réelle de fin + un écart calculé permettent un suivi
   manuel prévisionnel/réel, sans aucun lien automatique avec les OF/mouvements
   de stock existants (hors périmètre strict, cf. README).
@@ -32,9 +33,10 @@ Ce module ne modifie et ne dépend d'AUCUN modèle mrp.* ou stock.* existant.
     "license": "LGPL-3",
     "category": "Services/Project",
     # 'project' : project.task, project.project, project.milestone,
-    # dépendances de tâches natives, date_deadline — tout Community. Aucune
-    # dépendance, même souple, à 'project_enterprise' : ce module n'utilise
-    # plus aucun champ non garanti (cf. README §0).
+    # dépendances de tâches natives — tout Community. Pas de dépendance dure
+    # à 'project_enterprise' (le module doit pouvoir s'installer même sans),
+    # mais son absence bloque explicitement action_generate()
+    # (planned_date_begin manquant) — cf. README §0.
     "depends": ["project"],
     "data": [
         "security/ir.model.access.csv",
