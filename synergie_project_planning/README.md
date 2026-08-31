@@ -18,8 +18,7 @@ Confirmé dans les sources cœur (`project/models/project_task.py`, branche
 19.0) : `date_deadline = fields.Datetime(...)` est un champ **Community**
 natif, **toujours présent**. `planned_date_begin`, lui, est ajouté par un
 module Gantt (`project_enterprise` ou équivalent) — **pas garanti présent
-partout**. Le wizard vérifie sa présence avant toute création (`UserError`
-explicite sinon).
+partout**.
 
 ⚠️ **Point confirmé en test réel, plus strict qu'anticipé** : une version
 intermédiaire (v7) n'écrivait que `date_deadline`, en pariant qu'une tâche
@@ -30,6 +29,37 @@ dans le Gantt tant qu'elle n'est pas basculée manuellement en "mode plage"
 sont donc désormais posés systématiquement par le wizard, pour que chaque
 tâche s'affiche directement comme une barre avec sa durée calculée, sans
 bascule manuelle nécessaire.
+
+⚠️ **Garde-fou de présence retiré sur demande** (v10) : `action_generate()`
+ne vérifie plus `planned_date_begin` avant de créer les tâches. Si le champ
+est absent, `create()` échoue avec une erreur ORM brute (`Invalid field
+'planned_date_begin' in 'project.task'`) plutôt qu'un message explicite —
+acceptable pour cette maquette, dès lors que sa présence est vérifiée
+**fonctionnellement en amont** (ci-dessous), pas à chaque exécution.
+
+### 0.1 Vérifier fonctionnellement que `planned_date_begin` est disponible
+
+Sans toucher au code, du plus simple au plus technique :
+
+1. **Sur une tâche, champ *Deadline*** : si un bouton/icône permet de
+   basculer vers un mode "plage" (*Toggle date range mode*) pour saisir un
+   début **et** une fin, c'est la preuve la plus directe — ce mode n'existe
+   que si `planned_date_begin` est disponible pour la paire avec
+   `date_deadline`.
+2. **Vue Gantt disponible ?** Dans la liste des tâches d'un projet, regardez
+   les icônes de changement de vue (en haut à droite) : une icône Gantt
+   (barres horizontales) n'apparaît que si le module qui apporte
+   `planned_date_begin` (`project_enterprise` ou équivalent) est installé.
+   Absente = le champ n'est probablement pas là.
+3. **Mode développeur** (Réglages > Général > activer le mode développeur,
+   ou `?debug=1` dans l'URL) **> Réglages > Technique > Base de données >
+   Champs** : filtrer Modèle = *Task* (`project.task`), Nom du champ
+   contient `planned_date_begin`. Un résultat confirme sa présence, et la
+   colonne *Module* indique ce qui l'a ajouté — la vérification la plus
+   directe et la plus fiable.
+4. **Apps** (retirer le filtre par défaut pour voir tous les modules,
+   installés ou non) : rechercher `project_enterprise` et vérifier son
+   statut d'installation.
 
 ## 1. Ce que fait la maquette
 
@@ -120,17 +150,17 @@ Seulement `project_id` (caché, `default` = `active_id`), `expected_reception_da
 `expected_qty`. Tous les autres champs des versions précédentes (bumping,
 températures, rendements) ont été **supprimés**, pas juste masqués.
 
-### 3.2 Garde-fou
+### 3.2 Aucun garde-fou
 
-**`planned_date_begin` présent ?** (§0) — `UserError` explicite si absent,
-avant toute création. `date_deadline` n'a pas besoin d'être vérifié : champ
-Community, toujours présent.
-
-Pas de garde-fou d'idempotence (retiré sur demande, avec le champ
+Ni sur la présence de `planned_date_begin` (retiré sur demande — sa présence
+se vérifie fonctionnellement en amont, cf. §0.1, pas à chaque exécution du
+wizard), ni sur l'idempotence (retiré précédemment, avec le champ
 `x_generated_by_wizard` qui le portait, supprimé). Le wizard génère
 systématiquement 3 nouvelles tâches + 2 nouveaux jalons à chaque clic, sans
 rien vérifier ni supprimer côté données existantes. Relancer plusieurs fois
 sur le même projet **empile** les tâches/jalons plutôt que de les remplacer.
+Si `planned_date_begin` est absent, `create()` échoue avec une erreur ORM
+brute (`Invalid field 'planned_date_begin' in 'project.task'`).
 
 ### 3.3 Action de retour
 
@@ -211,10 +241,14 @@ dans ce module.
   tableau de bord du projet, confirmé dans les sources cœur) — rien à
   ajouter côté vue pour ce module, quelle que soit la façon dont les tags
   sont renseignés.
-- **v9 (actuelle)** : retour sur `planned_date_begin` — confirmé en test
-  réel qu'une tâche sans ce champ n'apparaît **pas du tout** dans le Gantt
-  (pas juste comme un point, contrairement à l'hypothèse de la v7). Les deux
-  champs (`planned_date_begin` + `date_deadline`) sont désormais posés
-  systématiquement, avec le garde-fou de présence de `planned_date_begin`
-  réintroduit. La tâche B est en plus liée au jalon « Jalon 1 » via
-  `milestone_id`.
+- **v9** : retour sur `planned_date_begin` — confirmé en test réel qu'une
+  tâche sans ce champ n'apparaît **pas du tout** dans le Gantt (pas juste
+  comme un point, contrairement à l'hypothèse de la v7). Les deux champs
+  (`planned_date_begin` + `date_deadline`) sont désormais posés
+  systématiquement, avec un garde-fou de présence sur `planned_date_begin`.
+  La tâche B est en plus liée au jalon « Jalon 1 » via `milestone_id`.
+- **v10 (actuelle)** : garde-fou de présence sur `planned_date_begin` retiré
+  sur demande — sa disponibilité se vérifie désormais **fonctionnellement**,
+  en amont, une fois par instance (cf. §0.1), plutôt qu'à chaque exécution
+  du wizard. S'il est absent, `create()` échoue avec l'erreur ORM brute
+  plutôt qu'un message dédié.

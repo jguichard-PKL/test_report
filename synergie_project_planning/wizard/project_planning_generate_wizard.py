@@ -2,7 +2,6 @@
 from datetime import datetime, time, timedelta
 
 from odoo import _, fields, models
-from odoo.exceptions import UserError
 
 # Temps de traitement unitaire, en dur pour cette maquette (plus de
 # paramètre système ni de champ configurable — cf. README).
@@ -44,12 +43,17 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
 
         `planned_date_begin` (début) ET `date_deadline` (fin) sont posés sur
         chaque tâche, pour qu'elle s'affiche en mode "plage" (barre) dans le
-        Gantt. Revenu sur la décision v7 (date_deadline seul) : confirmé en
-        test réel que sans `planned_date_begin`, une tâche n'apparaît PAS DU
-        TOUT dans le Gantt — pas juste comme un point, contrairement à
-        l'hypothèse initiale. `planned_date_begin` reste un champ non
-        garanti partout (ajouté par un module Gantt type project_enterprise,
-        absent en Community) : vérifié avant toute création (cf. README §0).
+        Gantt. Confirmé en test réel que sans `planned_date_begin`, une
+        tâche n'apparaît PAS DU TOUT dans le Gantt — pas juste comme un
+        point.
+
+        ⚠️ `planned_date_begin` n'est PAS un champ garanti sur toute
+        installation (ajouté par un module Gantt type project_enterprise,
+        absent en Community) — sa présence n'est plus vérifiée ici (garde-fou
+        retiré sur demande). S'il est absent, `create()` échoue avec une
+        erreur ORM brute (`Invalid field 'planned_date_begin' in
+        'project.task'`) plutôt qu'un message explicite. Cf. README §0 pour
+        comment vérifier sa présence en amont, fonctionnellement.
 
         - Tâche A : début = date de réception ; fin = début + (qty × 10 min).
         - Tâche B (bloquée par A, liée au jalon "Jalon 1") : début =
@@ -63,16 +67,6 @@ class ProjectPlanningGenerateWizard(models.TransientModel):
         chaque tâche, décision explicite (cf. README).
         """
         self.ensure_one()
-
-        if "planned_date_begin" not in self.env["project.task"]._fields:
-            raise UserError(
-                _(
-                    "Cette maquette nécessite le champ 'planned_date_begin' "
-                    "sur project.task (normalement ajouté par le module "
-                    "Gantt Enterprise 'project_enterprise'), absent sur "
-                    "cette base — cf. §0 du README de ce module."
-                )
-            )
 
         if not self.project_id.allow_task_dependencies:
             self.project_id.allow_task_dependencies = True
