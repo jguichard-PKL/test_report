@@ -1,22 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- Nouvelle page sur le formulaire tâche : champs de planification
-         prévisionnelle du prototype. Insérée en fin de notebook (position
-         "inside" sur <notebook>, pas ancrée à une page cœur précise) pour
-         rester robuste si l'ordre/le nom des pages cœur change.
+    <!-- Nouvelle page sur le formulaire tâche : champs de suivi de la
+         maquette. Insérée en fin de notebook (position "inside" sur
+         <notebook>, pas ancrée à une page cœur précise) pour rester robuste
+         si l'ordre/le nom des pages cœur change.
 
          Ne référence JAMAIS planned_date_begin / planned_date_end : ces
-         champs n'existent que si project_enterprise est installé (absents
-         du modèle en Community, pas seulement de la vue cœur) — les
-         référencer ici casserait l'INSTALLATION du module sur une base
-         Community. Quand project_enterprise est installé, ses propres vues
-         les affichent déjà ; rien à ajouter côté ce module.
+         champs natifs (Gantt Enterprise) ne sont pas garantis présents sur
+         toute instance (état incohérent constaté en test réel, cf. README
+         §0) — les référencer ici casserait l'INSTALLATION du module si
+         absents. Quand ils sont disponibles, la vue Enterprise les affiche
+         déjà ; rien à ajouter côté ce module.
 
-         depend_on_ids n'est pas repris ici non plus : déjà éditable
-         nativement via la page cœur "Blocked By" (project.view_task_form2),
-         visible dès que allow_task_dependencies est actif sur le projet
-         (posé par le wizard, §4.3 point 2).
+         depend_on_ids n'est pas repris ici : déjà éditable nativement via
+         la page cœur "Blocked By" (project.view_task_form2), visible dès
+         que allow_task_dependencies est actif sur le projet (posé par le
+         wizard). Idem pour les jalons (page cœur dédiée, actifs dès que
+         allow_milestones est posé par le wizard).
 
          [À vérifier v19] id de vue : project.view_task_form2. -->
     <record id="view_task_form2_planning" model="ir.ui.view">
@@ -27,13 +28,6 @@
             <notebook position="inside">
                 <page name="planning_prototype" string="Planification prévisionnelle">
                     <group>
-                        <group string="Durée">
-                            <field name="x_duration_type"/>
-                            <field name="x_fixed_duration_hours" invisible="x_duration_type != 'fixed'"/>
-                            <field name="x_unit_time_minutes" invisible="x_duration_type != 'proportional'"/>
-                            <field name="x_planned_qty" invisible="x_duration_type != 'proportional'"/>
-                            <field name="x_planned_duration_hours"/>
-                        </group>
                         <group string="Suivi réel">
                             <field name="x_actual_end_date"/>
                             <field name="x_deviation_days"/>

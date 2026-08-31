@@ -1,268 +1,203 @@
-# synergie_project_planning — Planification prévisionnelle du flux de production (Prototype)
+# synergie_project_planning — Planification prévisionnelle (Maquette)
 
-**Statut : PROTOTYPE TECHNIQUE.** Destiné à une démonstration/validation
-rapide avec Synergie CAD PSC (CAPECO), pas à la production. Basé sur
-`Spec_Technique_Prototype_ClaudeCode.md` (v0.3), lui-même adossé à
-`Specification_Synthetique_Planification_Previsionnelle_v0.1.md` (v0.5) —
-les deux dans `Documents/Spécifications/` au moment de l'écriture de ce
-module ; s'y référer pour tout point de contexte métier manquant ici.
+**Statut : MAQUETTE TECHNIQUE.** Démonstration très simple, pas un livrable
+de production. Cadrage initial dans `Spec_Technique_Prototype_ClaudeCode.md`
+(dans `Documents/Spécifications/`) — **cette version s'en écarte
+volontairement** : le catalogue de flow (Wafer Foundry, Bumping, Wafer
+Test...), les rendements et la distinction durée fixe/proportionnelle ont
+été **abandonnés sur demande**, au profit de 3 tâches à règles de date
+fixes et 2 jalons. Voir §1 pour le détail du changement de cap.
 
-Cible : **Odoo 19**. Conçu pour s'installer et fonctionner (sans vue Gantt)
-même sur une base **Community** — cf. §0.
+Cible : **Odoo 19**.
 
 ---
 
-## 0. Hypothèse critique : Enterprise vs Community
+## 0. Champs natifs Gantt : le bon couple identifié
 
-⚠️ **Situation réelle plus nuancée que prévu, découverte en test** : sur
-l'instance de test
-(`jguichard-pkl-test-report-lot-stock-....dev.odoo.com`),
-`planned_date_begin` **existe** sur `project.task`, mais `planned_date_end`
-**n'existe pas** — ce n'est donc pas un simple « Community vs Enterprise »
-binaire comme anticipé par la spec. Origine exacte non confirmée depuis cet
-environnement (`project_enterprise` n'étant pas public, impossible de
-vérifier son code source comme pour le reste du cœur Odoo) : soit un autre
-module installé sur cette instance fournit un champ `planned_date_begin`
-pour un usage sans rapport avec le Gantt, soit la structure réelle diffère
-de ce que documente la spec. **À creuser directement dans Réglages >
-Technique > Base de données > Champs (modèle `project.task`, recherche
-« planned »/« date ») si vous voulez identifier précisément ce qui existe.**
+**L'intérêt de cette maquette est d'utiliser le Gantt natif — décision du
+client, confirmée explicitement.** Le wizard écrit sur des champs natifs
+`project.task`, **pas** sur des champs propres au module (une version
+intermédiaire l'avait fait pour contourner l'incertitude ci-dessous — revenue
+en arrière sur demande).
 
-Première tentative d'installation en échec (`ValueError: Wrong @depends...
-Dependency field 'planned_date_end' not found in model project.task`) —
-corrigée (voir `_compute_x_deviation_days` ci-dessous). Le module s'installe
-désormais correctement.
+✅ **Résolu** : le couple de champs réellement utilisé par Odoo pour une
+tâche est **`planned_date_begin`** (début) et **`date_deadline`** (fin) —
+**pas** `planned_date_end`, sur lequel deux versions précédentes de ce
+module s'étaient braquées à tort. Découvert en observant le comportement
+réel de l'UI : sur le champ *Deadline* d'une tâche, un bouton *"Toggle date
+range mode"* permet de basculer vers la saisie d'un couple début/fin — ce
+qui n'a de sens que si *Deadline* (`date_deadline`) **est** le champ de fin
+utilisé en mode plage, avec `planned_date_begin` comme pendant "début".
 
-La spec (§0) demande explicitement de vérifier l'édition de la base avant de
-commencer, et d'arrêter/remonter le point si Community. Plutôt que de
-trancher ça à l'avance (aucun accès à votre instance de test depuis cet
-environnement), **le wizard vérifie ce prérequis lui-même, à l'exécution** :
+Confirmé dans les sources cœur (`project/models/project_task.py`, branche
+19.0) : `date_deadline = fields.Datetime(...)` est un champ **Community**
+natif, toujours présent, avec précision heure (ce qu'il fallait pour nos
+calculs en minutes). `planned_date_begin`, lui, reste ajouté par un module
+Gantt (`project_enterprise` ou équivalent) — pas garanti présent partout,
+mais visiblement actif sur l'instance cible (l'UI le confirme).
 
-- `project.task.planned_date_begin` / `planned_date_end` sont *supposés*
-  ajoutés ensemble par le module Enterprise `project_enterprise` — cf.
-  ci-dessus, ce n'est en réalité pas si simple sur cette instance.
-- `action_generate()` vérifie **les deux champs séparément**
-  (`missing_fields`, pas seulement `planned_date_begin`) **avant** toute
-  création de tâche. Si l'un des deux manque, il lève une `UserError`
-  explicite plutôt que de laisser échouer `create()` avec une erreur ORM peu
-  lisible. ⚠️ **Bug corrigé, rencontré en test réel** : la première version
-  ne vérifiait que `planned_date_begin`, en supposant les deux champs
-  toujours présents ensemble — insuffisant ici puisque `planned_date_begin`
-  existe seul sur cette instance ; `create()` plantait quand même sur
-  `planned_date_end`, avec un message ORM générique (`Invalid field
-  'planned_date_end' in 'project.task'`) au lieu du message explicite voulu.
-- Aucune vue XML de ce module ne référence `planned_date_begin`/
-  `planned_date_end` directement (ça ferait échouer l'**installation** du
-  module sur Community, pas juste son exécution). Quand `project_enterprise`
-  est installé, ses propres vues affichent déjà ces champs — rien à ajouter
-  côté ce module.
-- L'action de retour du wizard (§4.3 point 6) détecte aussi dynamiquement si
-  `project_enterprise` est installé pour proposer la vue Gantt, sinon liste.
+`planned_date_end` n'a jamais été le bon champ — les deux versions
+précédentes de ce module poursuivaient une fausse piste (documentée par
+prudence à l'§6, pour ne pas perdre cette leçon).
 
-⚠️ **Piège distinct, rencontré en test réel** : le garde-fou runtime du
-wizard (ci-dessus) ne protège que l'**exécution** du wizard — il ne protège
-PAS l'**installation** du module. Le champ `x_deviation_days`
-([models/project_task.py](models/project_task.py)) avait initialement
-`planned_date_end` dans son `@api.depends`. Odoo valide les `@api.depends`
-à la **construction du registre** (donc à l'install/upgrade du module, avant
-même qu'un utilisateur touche à quoi que ce soit) — un `@api.depends` sur un
-champ absent du modèle fait échouer l'installation entière avec
-`ValueError: Wrong @depends`, sans rapport avec le garde-fou runtime du
-wizard. Corrigé en ne dépendant que de `x_actual_end_date` (champ propre à
-ce module, toujours présent) et en lisant `planned_date_end` dynamiquement
-dans le corps de la méthode, seulement s'il existe (`"planned_date_end" in
-self._fields`). Conséquence assumée : si `project_enterprise` est installé
-et que `planned_date_end` change après coup (ex. glissé dans le Gantt),
-`x_deviation_days` ne se recalcule pas automatiquement — il faudra
-rouvrir/resauvegarder la tâche.
+Le wizard vérifie toujours que `planned_date_begin` existe avant de générer
+quoi que ce soit (`UserError` explicite sinon) — mais plus `planned_date_end`,
+qui n'est simplement pas utilisé.
 
-**Conséquence pratique** : sur une base Community, le wizard refuse de
-générer quoi que ce soit tant que ce point n'est pas résolu (module Gantt
-tiers, ou confirmation que le point est hors périmètre pour ce test) — mais
-le **module s'installe sans erreur** dans tous les cas, dépendances de
-tâches (`depend_on_ids`, natif Community depuis Odoo 17) comprises.
+## 1. Ce que fait la maquette
 
-## 1. Périmètre — ce qui N'est PAS touché
+Un wizard, lancé depuis la fiche projet (bouton en en-tête — cf. §4), prend
+**deux entrées seulement** :
 
-Repris strictement de la spec (§1) : **aucun** modèle `mrp.*` ou `stock.*`
-existant n'est modifié, étendu, ni même dépendu par ce module. Aucun lien
-automatique avec les OF, mouvements, lots ou restrictions par projet déjà en
-place (`synergie_stock_project`, `synergie_mrp_performance`). Le
-déclenchement est **exclusivement manuel** via le wizard — pas de génération
-automatique depuis un BL, une commande, ou tout autre événement.
+- **Quantité à réceptionner** (`input_qty`)
+- **Date de début de projet** (`start_datetime`, date + heure)
+
+Et génère, en un clic :
+
+| Tâche | Dépend de | Début | Fin |
+|---|---|---|---|
+| **A** | — | `start_datetime` | début + (qty × 10 min) |
+| **B** | A (« blocked by ») | lendemain de la fin de A, 9h00 | début + 48h |
+| **C** | B (« blocked by ») | lendemain de la fin de B, 9h00 | début + 24h + (qty × 10 min) |
+
+Et 2 jalons (`project.milestone`, natif Community — cf. §2) :
+
+| Jalon | Échéance |
+|---|---|
+| **Jalon 1** | date de fin de la tâche A |
+| **Deadline** | fin de la tâche C + 48h |
+
+✅ **Interprétations confirmées côté client** — l'énoncé initial ne précisait
+pas tout littéralement, deux points ont été tranchés :
+
+- « Date de fin = Date de début **×** (qty × 10 min) » n'avait pas de sens
+  arithmétique sur une date tel quel. Confirmé : une **addition** (début +
+  durée) — `piece_duration = timedelta(minutes=qty × MINUTES_PER_PIECE)`.
+- « Lendemain de la date de fin » : confirmé comme **le jour calendaire
+  suivant, à 9h00 fixe** (pas la même heure que la fin de la tâche
+  précédente, pas minuit) — `_next_day_at()` /
+  `NEXT_DAY_START_TIME = time(9, 0)`.
+- 10 minutes/pièce est **en dur** dans le wizard (`MINUTES_PER_PIECE`,
+  [wizard/project_planning_generate_wizard.py](wizard/project_planning_generate_wizard.py)) — plus de
+  paramètre système ni de champ configurable (l'ancien `x_unit_time_minutes`
+  et le paramètre `planning.default_unit_time_minutes` ont été retirés,
+  devenus sans usage dans cette version).
+- **Aucun calendrier ouvré** n'est appliqué (contrairement à la version
+  précédente, qui passait par `resource.calendar.plan_hours()`) : tous les
+  décalages sont des durées calendaires brutes (`timedelta`). Un week-end
+  n'est jamais sauté.
 
 ## 2. Modèle de données
 
-### 2.1 Extension de `project.task` ([models/project_task.py](models/project_task.py))
+### 2.1 `project.task` ([models/project_task.py](models/project_task.py))
 
 | Champ | Type | Détail |
 |---|---|---|
-| `x_duration_type` | Selection (Fixe/Proportionnelle), required | Défaut `proportional`. |
-| `x_fixed_duration_hours` | Float | Utilisé si `x_duration_type == 'fixed'`. |
-| `x_unit_time_minutes` | Float | Copié depuis le paramètre système (§2.3) **à la création uniquement** (`default=`, pas de `compute`) — pas de lien dynamique ensuite, pour ne pas modifier une planification déjà communiquée si le paramètre change. |
-| `x_planned_qty` | Integer | Calculée par le wizard. 0 pour une étape fixe. Non éditable manuellement après génération (prototype). |
-| `x_planned_duration_hours` | Float, computed, stored | Fixe si type Fixe, sinon `qty × temps_unitaire / 60`. |
-| `x_generated_by_wizard` | Boolean | Marqueur utilisé par le garde-fou d'idempotence du wizard. |
-| `x_actual_end_date` | Date | Saisie manuelle admin. Aucun lien avec un OF. |
-| `x_deviation_days` | Float, computed, stored | = date réelle − `planned_date_end`, en jours. |
+| `x_generated_by_wizard` | Boolean | Marqueur pour le garde-fou d'idempotence du wizard. |
+| `x_actual_end_date` | Date | Saisie manuelle admin, aucun lien avec un OF. |
+| `x_deviation_days` | Float, computed, stored | = date réelle − `date_deadline` (natif), en jours. |
 
-⚠️ **Limite assumée** sur `x_deviation_days` : type `Float`, donc sans valeur
-calculable il vaut `0.0`, pas "vide" au sens strict (un `Float` standard ne
-distingue pas 0 de "non renseigné" dans les vues Odoo). Cohérent avec la
-simplicité demandée pour ce prototype ; à reconsidérer si ça prête à
-confusion en démo (ex. widget dédié, ou passage en `Char` formaté).
+Champs natifs réutilisés tels quels : `planned_date_begin` (début, Gantt —
+présence non garantie mais confirmée active sur l'instance cible),
+`date_deadline` (fin, Community, toujours présent — cf. §0),
+`depend_on_ids` (dépendances, Community depuis Odoo 17), `project_id`.
 
-Champs natifs réutilisés tels quels : `planned_date_begin`, `planned_date_end`
-(Enterprise uniquement, cf. §0), `depend_on_ids`, `project_id`.
+`x_deviation_days` dépend directement de `date_deadline` dans son
+`@api.depends` — safe, puisque c'est un champ Community garanti. Pas besoin
+du contournement (lecture dynamique via `_fields`) qu'aurait nécessité
+`planned_date_begin` si on en avait eu besoin dans ce compute.
 
-### 2.2 Pas d'extension du produit
+⚠️ Comme précédemment, `x_deviation_days` vaut `0.0` (pas "vide") quand
+non calculable — un `Float` standard ne distingue pas 0 de "non renseigné".
 
-Décision explicite reprise de la spec (§2.2) : `product.template` n'est **pas**
-touché. Les rendements sont de simples champs du wizard, sans stockage
-persistant — cf. §8 de la spec synthétique pour le point ouvert sur leur
-emplacement définitif (hors périmètre du prototype).
+### 2.2 `project.milestone` — natif, pas d'extension
 
-### 2.3 Paramètre système ([data/ir_config_parameter_data.xml](data/ir_config_parameter_data.xml))
+**Vérifié dans les sources** (`addons/project/models/project_milestone.py`,
+branche 19.0) : `project.milestone` est **natif Community**, pas Enterprise
+— aucun risque de reproduire le problème du §0. Champs utilisés tels quels :
+`name`, `project_id`, `deadline` (type **Date**, pas Datetime — les jalons
+n'ont pas d'heure, seulement `.date()` de la valeur calculée est stocké).
 
-`ir.config_parameter` clé `planning.default_unit_time_minutes`, valeur
-prototype `1` (min/pièce). `noupdate="1"` : une valeur modifiée manuellement
-n'est jamais écrasée par une mise à jour du module.
+`project.project.allow_milestones` doit être actif pour que les jalons
+soient visibles/utilisables (même mécanique que `allow_task_dependencies`
+pour les dépendances) — le wizard l'active automatiquement si besoin.
 
-## 3. Catalogue des étapes ([wizard/project_planning_generate_wizard.py](wizard/project_planning_generate_wizard.py), `_get_flow_steps()`)
+Les jalons créés ne sont **pas** liés à une tâche via `task_ids`/
+`milestone_id` (pas demandé) — ce sont des jalons de projet autonomes, avec
+juste le bon nom et la bonne échéance.
 
-Codé en dur (liste Python ordonnée), **pas** un référentiel paramétrable —
-conforme à la spec (§3) : « ne pas chercher à généraliser au-delà de ce
-catalogue ». Valeurs de démonstration (5j / 3j / 24h), **pas des données
-validées avec le client**.
+## 3. Wizard (`project.planning.generate.wizard`)
 
-| Étape | Code(s) | Condition d'activation | Type |
-|---|---|---|---|
-| Wafer Foundry | WF | Toujours | Fixe, 5j |
-| Bumping | BP | `has_bumping` | Fixe, 3j |
-| Wafer Test | D1, D2, D3 | 1 à 3 selon `wafer_test_temp_count` | Proportionnelle |
-| Retention Bake | RB | `has_retention_bake` | Fixe, 24h |
-| Assembly | RL | Toujours | Proportionnelle |
-| Final Test | TG (Std), TH (Hot), TC (Cold) | 1 à 3 selon `final_test_temp_count` | Proportionnelle |
-| End Of Line | FG | Toujours | Proportionnelle |
+### 3.1 Champs
 
-⚠️ **Interprétation assumée, à confirmer avec le client** : la spec dit
-« Nombre de températures configurable (1 à 3) » pour Wafer Test et Final
-Test sans détailler l'effet sur la génération. Ce module génère **une tâche
-séquentielle par température** (ex. `wafer_test_temp_count=2` → deux tâches
-D1 puis D2, chaînées), **toutes à la même quantité prévisionnelle** — le
-rendement du groupe (`yield_wafer_test`/`yield_final_test`) s'applique **une
-seule fois**, à l'entrée du groupe, pas par température testée
-individuellement. Cohérent avec l'exemple chiffré de la spec synthétique
-(§6 : un seul rendement par groupe d'étape), mais si plusieurs températures
-impliquent réellement des rendements distincts en production, cette logique
-devra être revue avant généralisation.
+Seulement `project_id` (caché, `default` = `active_id`), `start_datetime`,
+`input_qty`. Tous les autres champs de la version précédente (bumping,
+températures, rendements) ont été **supprimés**, pas juste masqués.
 
-Retention Bake est un code unique (`RB`), pas de variante par température
-précédente (la spec catalogue mentionne `D1B`/`D2B` sans en préciser l'usage
-fonctionnel exact) — simplification assumée, sans impact sur le calcul.
+### 3.2 Garde-fous, dans l'ordre
 
-## 4. Wizard de génération (`project.planning.generate.wizard`)
+1. **`planned_date_begin` présent ?** (§0) — `UserError` explicite si absent,
+   **avant** toute création de tâche. `date_deadline` n'a pas besoin d'être
+   vérifié : c'est un champ Community, toujours présent.
+2. **Idempotence** — si une tâche `x_generated_by_wizard = True` existe déjà
+   pour le projet, le wizard bloque avec un message explicite plutôt que de
+   dupliquer.
 
-Bouton « Générer la planification prévisionnelle » sur l'en-tête du
-formulaire projet ([views/project_project_views.xml](views/project_project_views.xml)) — `type="action"`
-référençant directement l'action du wizard : Odoo passe alors automatiquement
-`active_id`/`active_model` dans le contexte, exploités par le `default` de
-`project_id` sur le wizard (pas de méthode Python dédiée sur `project.project`
-nécessaire).
+### 3.3 Action de retour
 
-### Algorithme (`action_generate()`)
+Vue Gantt si `project_enterprise` est installé (détection dynamique via
+`ir.module.module`, pas supposée), sinon liste — même mécanique que dans la
+version initiale du prototype.
 
-Numérotation alignée sur la spec §4.3 :
-
-0. **[Ajout non demandé explicitement par ce numéro, mais nécessaire — cf. §0]** Vérifie que `planned_date_begin` existe sur `project.task` ; sinon `UserError` explicite.
-1. Garde-fou d'idempotence : `UserError` si une planification existe déjà pour ce projet (`x_generated_by_wizard = True`).
-2. Active `allow_task_dependencies` sur le projet si besoin.
-3. Construit la liste ordonnée des étapes actives (§3).
-4. Propage la quantité à travers les rendements saisis (100% par défaut → propagation 1:1). Arrondi à l'entier le plus proche à chaque application de rendement.
-5. Pour chaque étape : calcule la durée, chaîne `planned_date_begin`/`planned_date_end` via `resource.calendar.plan_hours()` (calendrier de la société du projet, à défaut de la société courante), crée la `project.task` avec `depend_on_ids` pointant vers l'étape précédente.
-6. Retourne une action ouvrant les tâches créées — vue Gantt si `project_enterprise` est installé, sinon liste (détection dynamique, cf. §0).
-
-⚠️ **`resource.calendar.plan_hours(hours, day_dt, compute_leaves=True)`** —
-méthode confirmée en lisant directement `resource/models/resource_calendar.py`
-(branche 19.0) : retourne la date/heure après avoir « planifié » N heures
-ouvrées depuis `day_dt`. Appliquée **uniformément à toutes les étapes**
-(fixes et proportionnelles), conformément à la lettre de l'algorithme §4.3
-point 5c. Point à discuter avec le client : un lead time fournisseur ou un
-bake physique tournent en temps réel continu, pas seulement en heures
-ouvrées — les convertir en temps ouvré comme une étape de production
-interne peut décaler artificiellement les dates (ex. un bake de 24h démarré
-un vendredi soir « saute » le week-end au lieu de se terminer samedi). Choix
-délibéré de suivre l'algorithme tel quel plutôt que d'improviser une
-distinction fixe/proportionnelle non demandée ; à trancher si le prototype
-est généralisé.
-
-⚠️ **Durée nulle** : si `plan_hours(0, begin)` est appelé alors que `begin`
-tombe hors horaires ouvrés, la méthode cœur peut renvoyer le **début du
-prochain intervalle ouvré** plutôt que `begin` lui-même — ce qui décalerait
-une étape à durée nulle. Contourné en court-circuitant `plan_hours()` pour
-une durée nulle (`end = begin` directement).
-
-Si `plan_hours()` renvoie `False` (aucun intervalle ouvré trouvé sur le
-calendrier), repli sur un ajout de temps brut (`timedelta`) plutôt que de
-bloquer la génération — pour rester utilisable en démo même avec un
-calendrier mal configuré.
-
-## 5. Vues ajoutées
+## 4. Vues
 
 - [views/project_task_views.xml](views/project_task_views.xml) : nouvelle page « Planification
-  prévisionnelle » sur le formulaire tâche, insérée en fin de notebook
-  (`position="inside"` sur `<notebook>`, pas ancrée à une page cœur précise —
-  robuste si l'ordre/le nom des pages cœur change). Ne référence **jamais**
-  `planned_date_begin`/`planned_date_end` (cf. §0). `depend_on_ids` n'est pas
-  repris : déjà éditable nativement via la page cœur « Blocked By »,
-  visible dès que `allow_task_dependencies` est actif (posé par le wizard).
-- [views/project_project_views.xml](views/project_project_views.xml) : bouton d'accès au wizard.
-- [wizard/project_planning_generate_wizard_views.xml](wizard/project_planning_generate_wizard_views.xml) : formulaire du wizard + action.
+  prévisionnelle » sur le formulaire tâche (suivi réel uniquement).
+  **Ne référence jamais `planned_date_begin`** (§0) : le citer dans une vue
+  XML casserait l'installation si absent — quand il est disponible, la vue
+  Gantt Enterprise l'affiche déjà (avec `date_deadline`, déjà natif au
+  formulaire tâche cœur), rien à ajouter côté ce module. `depend_on_ids` et
+  les jalons ne sont pas repris non plus : déjà natifs (page « Blocked By »
+  / onglet Jalons), visibles dès que `allow_task_dependencies`/
+  `allow_milestones` sont actifs sur le projet (posés par le wizard).
+- [views/project_project_views.xml](views/project_project_views.xml) : bouton d'accès au wizard sur
+  l'en-tête du formulaire **projet** (`project.edit_project`) — **pas**
+  visible en cliquant sur la carte du projet depuis le tableau de bord
+  (qui ouvre ses tâches) ; utiliser le menu ⋮/engrenage de la carte →
+  « Modifier » pour atteindre le vrai formulaire projet.
+- [wizard/project_planning_generate_wizard_views.xml](wizard/project_planning_generate_wizard_views.xml) : formulaire du wizard (2 champs) + action.
 
-⚠️ **Piège rencontré en test réel, corrigé** : `project_project_views.xml`
-référence l'action du wizard via `%(synergie_project_planning.action_...)d`.
-Les fichiers XML d'un module sont chargés dans l'**ordre exact** de la liste
-`data` du manifeste ; une référence en avant vers un XML ID pas encore
-chargé échoue immédiatement à l'installation
-(`ValueError: External ID not found in the system`). Le manifeste liste donc
-`wizard/project_planning_generate_wizard_views.xml` **avant**
-`views/project_project_views.xml`.
+⚠️ **Piège d'ordre de chargement, déjà rencontré et corrigé** :
+`project_project_views.xml` référence l'action du wizard via
+`%(...)d` — les fichiers XML se chargent dans l'ordre exact de la liste
+`data` du manifeste ; le fichier définissant l'action doit être chargé
+**avant** celui qui la référence, sous peine d'échec à l'installation
+(`ValueError: External ID not found in the system`).
 
-## 6. Scénario de test
+## 5. Hors périmètre (inchangé)
 
-Reprendre le scénario de la spec technique §6 (non dupliqué ici pour éviter
-toute divergence entre les deux documents). Points à consigner précisément
-en le déroulant, comme demandé par la spec :
+Aucun lien, aucune dépendance, à un modèle `mrp.*`/`stock.*` existant.
+Déclenchement exclusivement manuel via le wizard. Pas de données de démo
+dans ce module.
 
-- **Test 4/5 (cascade Gantt)** : le comportement réel de replanification
-  (glisser-déposer Gantt vs formulaire standard vs écriture ORM) reste à
-  confirmer sur votre instance — la recherche préalable (§0 de la spec)
-  rend probable que seul le glisser-déposer déclenche une cascade, mais
-  ceci n'a **pas** été vérifié en conditions réelles depuis cet
-  environnement de développement (pas d'accès à une instance Odoo en
-  direct). Le résultat de ce test conditionne si un développement de
-  sécurisation supplémentaire (repropagation serveur des dates en cascade)
-  est nécessaire — **non implémenté dans cette itération**, la spec
-  demandant explicitement de traiter ce point comme un test à consigner,
-  pas une fonctionnalité à construire par anticipation (cf. spec synthétique
-  §8, changelog v0.5).
+## 6. Historique des versions de ce module
 
-## 7. Simplifications assumées (cf. spec §7 — ne pas sur-développer au-delà)
-
-- Un seul temps unitaire global, copié à la création de chaque tâche.
-- Calcul strictement séquentiel, aucune capacité/parallélisation.
-- Calendrier de travail standard (pas d'équipes postées).
-- Flow fermé, codé en dur (§3).
-- Aucun lien avec les modèles `mrp.*`/`stock.*` existants.
-- Pas de données de démonstration dans ce module (déjà disponibles côté
-  Synergie) — à créer manuellement si besoin (projet + produits stockables
-  suivis par lot, cf. spec §5 pour la convention de nommage si utile).
-
-## 8. Après le prototype
-
-Ce module ne remplace pas une SFD complète. Les points ouverts de
-`Specification_Synthetique_Planification_Previsionnelle_v0.1.md` §8 (type de
-durée par étape à trancher avec le client, granularité du suivi réel,
-répercussion automatique ou non d'un écart, stockage définitif des
-rendements, etc.) restent à trancher avant toute généralisation au-delà du
-projet pilote.
+- **v1 (abandonnée)** : catalogue de flow complet (Wafer Foundry → ... →
+  End Of Line), rendements par étape saisis dans le wizard, distinction
+  durée fixe/proportionnelle, temps unitaire paramétrable,
+  `resource.calendar.plan_hours()` pour le temps ouvré. Écrivait déjà sur
+  les champs natifs `planned_date_begin`/`planned_date_end`.
+- **v2 (abandonnée)** : maquette simplifiée (3 tâches à règles de date
+  fixes, 2 jalons), mais avec des champs de date **propres au module**
+  (`x_planned_date_begin`/`x_planned_date_end`) pour contourner le problème
+  du §0 — écarté : ça empêchait tout affichage dans le Gantt Enterprise, qui
+  est précisément l'objectif de la maquette.
+- **v3 (abandonnée)** : retour sur des champs natifs, mais toujours
+  `planned_date_begin`/`planned_date_end` — le wizard échouait proprement
+  (message explicite) faute de `planned_date_end`, sans résoudre le fond.
+- **v4 (actuelle)** : **bon couple de champs identifié** —
+  `planned_date_begin` (début) + `date_deadline` (fin), pas
+  `planned_date_end`. Découvert en observant le comportement réel de l'UI
+  (bouton "Toggle date range mode" sur le champ *Deadline* de la tâche).
+  `date_deadline` est Community natif, toujours présent ; `planned_date_begin`
+  reste le seul champ dont la présence est vérifiée avant génération. Cf. §0.

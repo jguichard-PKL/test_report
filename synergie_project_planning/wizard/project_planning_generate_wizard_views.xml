@@ -8,23 +8,8 @@
             <form string="Générer la planification prévisionnelle">
                 <field name="project_id" invisible="1"/>
                 <group>
-                    <field name="anchor_date"/>
+                    <field name="start_datetime"/>
                     <field name="input_qty"/>
-                </group>
-                <group string="Étapes actives du flow">
-                    <group>
-                        <field name="has_bumping"/>
-                        <field name="wafer_test_temp_count"/>
-                        <field name="has_retention_bake"/>
-                    </group>
-                    <group>
-                        <field name="final_test_temp_count"/>
-                    </group>
-                </group>
-                <group string="Rendements attendus (%) — 100 = pas de perte">
-                    <field name="yield_wafer_test"/>
-                    <field name="yield_assembly"/>
-                    <field name="yield_final_test"/>
                 </group>
                 <footer>
                     <button name="action_generate" type="object" string="Générer" class="btn-primary"/>
