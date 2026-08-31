@@ -1,12 +1,7 @@
 # synergie_project_planning — Planification prévisionnelle (Maquette)
 
 **Statut : MAQUETTE TECHNIQUE.** Démonstration très simple, pas un livrable
-de production. Cadrage initial dans `Spec_Technique_Prototype_ClaudeCode.md`
-(dans `Documents/Spécifications/`) — **cette version s'en écarte
-volontairement** : le catalogue de flow (Wafer Foundry, Bumping, Wafer
-Test...), les rendements et la distinction durée fixe/proportionnelle ont
-été **abandonnés sur demande**, au profit de 3 tâches à règles de date
-fixes et 2 jalons. Voir §1 pour le détail du changement de cap.
+de production. 
 
 Cible : **Odoo 19**.
 
